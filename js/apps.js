@@ -1,4 +1,4 @@
-// Web Desktop — aplikasi bawaan: Obrolan, Peramban, Catatan, Kalkulator, Files, Pengaturan, Musik.
+// Web Desktop — aplikasi bawaan: Obrolan, Peramban, Catatan, Kalkulator, Files, Pengaturan, Musik, Terminal.
 // Data Obrolan, Catatan, Files & Musik tersimpan di localStorage perangkat yang membuka web ini.
 (function () {
   "use strict";
@@ -521,6 +521,101 @@
     setMedia();
   }
 
+  // ---------- Terminal (perintah semu, tanpa akses sistem) ----------
+  // Hanya 5 perintah: help, about, echo, date, clear. Tidak menjalankan
+  // program apa pun dan tidak membaca/menulis berkas di perangkat.
+  function renderTerminal(body) {
+    var wrap = el('<div class="term-wrap"></div>');
+    var out = el('<div class="term-output"></div>');
+    var row = el('<div class="term-input-row"></div>');
+    var prompt = el('<span class="term-prompt">rutbhics:~$</span>');
+    var input = el('<input class="term-input" type="text" placeholder="Ketik help untuk daftar perintah...">');
+    row.appendChild(prompt); row.appendChild(input);
+    wrap.appendChild(out); wrap.appendChild(row);
+    body.appendChild(wrap);
+    body.appendChild(el('<p class="hint">Perintah semu saja — terminal ini tidak menjalankan program di perangkat.</p>'));
+
+    var history = [];
+    var histIdx = 0;
+
+    function print(text) {
+      var line = el('<div class="term-line"></div>');
+      line.textContent = text;
+      out.appendChild(line);
+      out.scrollTop = out.scrollHeight;
+    }
+    function printCmd(cmd) {
+      var line = el('<div class="term-line term-cmd"></div>');
+      line.textContent = "rutbhics:~$ " + cmd;
+      out.appendChild(line);
+      out.scrollTop = out.scrollHeight;
+    }
+    function wibDate() {
+      try {
+        return new Intl.DateTimeFormat("id-ID", {
+          timeZone: "Asia/Jakarta", weekday: "long", day: "numeric",
+          month: "long", year: "numeric", hour: "2-digit",
+          minute: "2-digit", second: "2-digit", hour12: false
+        }).format(new Date()) + " WIB";
+      } catch (e) { return new Date().toString(); }
+    }
+    function run(raw) {
+      var cmd = raw.trim();
+      if (!cmd) return;
+      printCmd(cmd);
+      var parts = cmd.split(/\s+/);
+      var name = parts[0].toLowerCase();
+      var arg = parts.slice(1).join(" ");
+      if (name === "help") {
+        print("Perintah yang tersedia:");
+        print("  help   - tampilkan daftar perintah ini");
+        print("  about  - tentang Rutbhics");
+        print("  echo   - tampilkan teks, mis. echo halo");
+        print("  date   - tanggal & jam sekarang (WIB)");
+        print("  clear  - bersihkan layar terminal");
+      } else if (name === "about") {
+        print("Rutbhics — desktop komputer di dalam browser.");
+        print("Dibangun dengan HTML, CSS, dan JavaScript murni, tanpa framework.");
+        print("Terminal ini hanya perintah semu: tidak menjalankan program atau mengakses berkas sistem.");
+      } else if (name === "echo") {
+        print(arg);
+      } else if (name === "date") {
+        print(wibDate());
+      } else if (name === "clear") {
+        out.innerHTML = "";
+      } else {
+        print("perintah tidak ditemukan: " + name + " — ketik help untuk daftar perintah.");
+      }
+    }
+
+    print("Selamat datang di Terminal Rutbhics! Ketik help untuk daftar perintah.");
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") {
+        var v = input.value;
+        if (v.trim()) { history.push(v); histIdx = history.length; }
+        input.value = "";
+        run(v);
+      } else if (e.key === "ArrowUp") {
+        if (history.length && histIdx > 0) {
+          histIdx -= 1;
+          input.value = history[histIdx];
+        }
+        e.preventDefault();
+      } else if (e.key === "ArrowDown") {
+        if (histIdx < history.length - 1) {
+          histIdx += 1;
+          input.value = history[histIdx];
+        } else {
+          histIdx = history.length;
+          input.value = "";
+        }
+        e.preventDefault();
+      }
+    });
+    wrap.addEventListener("click", function () { input.focus(); });
+    input.focus();
+  }
+
   window.APPS = {
     chat: { emoji: "💬", title: "Obrolan", render: renderChat },
     browser: { emoji: "🌐", title: "Peramban", render: renderBrowser },
@@ -528,6 +623,8 @@
     calc: { emoji: "🧮", title: "Kalkulator", render: renderCalc },
     files: { emoji: "📁", title: "Files", render: renderFiles },
     settings: { emoji: "⚙️", title: "Pengaturan", render: renderSettings },
-    music: { emoji: "🎵", title: "Musik", render: renderMusic }
+    music: { emoji: "🎵", title: "Musik", render: renderMusic },
+    terminal: { emoji: "💻", title: "Terminal", render: renderTerminal }
   };
 })();
+

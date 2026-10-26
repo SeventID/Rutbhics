@@ -316,3 +316,26 @@ body.light-theme .notif-item.unread { background: rgba(99, 102, 241, .15); }
 body.light-theme .music-row:hover { background: rgba(15, 23, 42, .08); }
 body.light-theme .music-row.active { background: rgba(99, 102, 241, .15); }
 body.light-theme .music-add input { background: rgba(15, 23, 42, .05); }
+
+
+/* Terminal */
+.term-output {
+  background: #0b1220; color: #a7f3d0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px; line-height: 1.55;
+  padding: 10px 12px; border-radius: 8px;
+  min-height: 200px; max-height: 300px; overflow: auto;
+  white-space: pre-wrap; word-break: break-word;
+}
+.term-line { margin: 0; }
+.term-cmd { color: #e2e8f0; font-weight: bold; }
+.term-input-row { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+.term-prompt {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 13px; font-weight: bold; color: #38bdf8; white-space: nowrap;
+}
+.term-input {
+  flex: 1; min-width: 0; background: #0b1220; color: #e2e8f0;
+  border: 1px solid #334155; border-radius: 6px; padding: 8px 10px;
+  font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px;
+}
