@@ -1,4 +1,4 @@
-// Web Desktop — aplikasi bawaan: Obrolan, Peramban, Catatan, Kalkulator, Files.
+// Web Desktop — aplikasi bawaan: Obrolan, Peramban, Catatan, Kalkulator, Files, Pengaturan.
 // Data Obrolan, Catatan & Files tersimpan di localStorage perangkat yang membuka web ini.
 (function () {
   "use strict";
@@ -273,11 +273,92 @@
     draw();
   }
 
+  // ---------- Pengaturan (wallpaper & tema, tersimpan lokal) ----------
+  // Kunci wd-wallpaper / wd-theme disimpan sebagai string mentah (bukan JSON),
+  // supaya desktop.js bisa membacanya langsung dengan getItem.
+  var WALLPAPERS = {
+    malam: { name: "Ungu Malam",
+      bg: "radial-gradient(600px 400px at 20% 15%, rgba(99, 102, 241, .45), transparent 60%), radial-gradient(700px 500px at 85% 80%, rgba(34, 211, 238, .30), transparent 60%), linear-gradient(160deg, #0f172a, #1e1b4b 55%, #0b1120)" },
+    senja: { name: "Senja Jingga",
+      bg: "radial-gradient(600px 400px at 20% 15%, rgba(251, 146, 60, .45), transparent 60%), radial-gradient(700px 500px at 85% 80%, rgba(244, 63, 94, .30), transparent 60%), linear-gradient(160deg, #431407, #7c2d12 55%, #1c1917)" },
+    hutan: { name: "Hutan Hijau",
+      bg: "radial-gradient(600px 400px at 20% 15%, rgba(52, 211, 153, .40), transparent 60%), radial-gradient(700px 500px at 85% 80%, rgba(163, 230, 53, .25), transparent 60%), linear-gradient(160deg, #052e16, #14532d 55%, #022c22)" },
+    laut: { name: "Laut Biru",
+      bg: "radial-gradient(600px 400px at 20% 15%, rgba(56, 189, 248, .45), transparent 60%), radial-gradient(700px 500px at 85% 80%, rgba(45, 212, 191, .30), transparent 60%), linear-gradient(160deg, #082f49, #0c4a6e 55%, #020617)" }
+  };
+  window.WALLPAPERS = WALLPAPERS;
+  function applyWallpaper(id) {
+    var w = document.getElementById("wallpaper");
+    var p = WALLPAPERS[id];
+    if (w && p) w.style.background = p.bg;
+  }
+  function applyTheme(theme) {
+    document.body.classList.toggle("light-theme", theme === "light");
+  }
+  function renderSettings(body) {
+    var curWp = "malam", curTheme = "dark";
+    try {
+      curWp = localStorage.getItem("wd-wallpaper") || "malam";
+      curTheme = localStorage.getItem("wd-theme") || "dark";
+    } catch (e) {}
+    if (!WALLPAPERS[curWp]) curWp = "malam";
+
+    body.appendChild(el('<h3 class="settings-title">Personalisasi desktop</h3>'));
+    body.appendChild(el('<p class="settings-head">Wallpaper</p>'));
+    var grid = el('<div class="wp-grid"></div>');
+    Object.keys(WALLPAPERS).forEach(function (id) {
+      var b = el('<button class="wp-swatch' + (id === curWp ? " active" : "") + '"></button>');
+      b.style.background = WALLPAPERS[id].bg;
+      b.title = WALLPAPERS[id].name;
+      var lbl = el('<span class="wp-label"></span>');
+      lbl.textContent = WALLPAPERS[id].name;
+      b.appendChild(lbl);
+      b.addEventListener("click", function () {
+        curWp = id;
+        try { localStorage.setItem("wd-wallpaper", id); } catch (e) {}
+        applyWallpaper(id);
+        grid.querySelectorAll(".wp-swatch").forEach(function (s) { s.classList.remove("active"); });
+        b.classList.add("active");
+      });
+      grid.appendChild(b);
+    });
+    body.appendChild(grid);
+
+    body.appendChild(el('<p class="settings-head">Tema</p>'));
+    var row = el('<div class="theme-row"></div>');
+    var darkBtn = el('<button class="chip theme-btn' + (curTheme === "dark" ? " active" : "") + '">🌙 Gelap</button>');
+    var lightBtn = el('<button class="chip theme-btn' + (curTheme === "light" ? " active" : "") + '">☀️ Terang</button>');
+    function setTheme(t) {
+      curTheme = t;
+      try { localStorage.setItem("wd-theme", t); } catch (e) {}
+      applyTheme(t);
+      darkBtn.classList.toggle("active", t === "dark");
+      lightBtn.classList.toggle("active", t === "light");
+    }
+    darkBtn.addEventListener("click", function () { setTheme("dark"); });
+    lightBtn.addEventListener("click", function () { setTheme("light"); });
+    row.appendChild(darkBtn); row.appendChild(lightBtn);
+    body.appendChild(row);
+
+    var reset = el('<button class="btn-primary" style="margin-top:18px">Kembalikan bawaan</button>');
+    reset.addEventListener("click", function () {
+      try { localStorage.removeItem("wd-wallpaper"); localStorage.removeItem("wd-theme"); } catch (e) {}
+      applyWallpaper("malam");
+      setTheme("dark");
+      var sw = grid.querySelectorAll(".wp-swatch");
+      sw.forEach(function (s) { s.classList.remove("active"); });
+      if (sw[0]) sw[0].classList.add("active");
+    });
+    body.appendChild(reset);
+    body.appendChild(el('<p class="hint">Pengaturan tersimpan di perangkat ini dan langsung diterapkan saat desktop dibuka lagi.</p>'));
+  }
+
   window.APPS = {
     chat: { emoji: "💬", title: "Obrolan", render: renderChat },
     browser: { emoji: "🌐", title: "Peramban", render: renderBrowser },
     notes: { emoji: "📝", title: "Catatan", render: renderNotes },
     calc: { emoji: "🧮", title: "Kalkulator", render: renderCalc },
-    files: { emoji: "📁", title: "Files", render: renderFiles }
+    files: { emoji: "📁", title: "Files", render: renderFiles },
+    settings: { emoji: "⚙️", title: "Pengaturan", render: renderSettings }
   };
 })();

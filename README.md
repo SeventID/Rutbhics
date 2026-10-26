@@ -36,13 +36,17 @@ Nginx, atau hosting statis apa pun) — tidak butuh backend.
   Catatan: banyak situs besar memblokir tampil di iframe (X-Frame-Options).
 - **Catatan** — catatan teks tersimpan di `localStorage`.
 - **Kalkulator** — operasi dasar tanpa `eval`.
+- **Files** — penjelajah berkas virtual (folder, berkas teks, edit, hapus),
+  tersimpan di `localStorage`.
+- **Pengaturan** — ganti wallpaper (4 pilihan) dan tema terang/gelap,
+  tersimpan di `localStorage` dan diterapkan saat desktop dibuka lagi.
 
 ## Peta jalan (roadmap)
 
 Urutan pembangunan berikutnya (satu item per jadwal build):
 
-1. Aplikasi Files (penjelajah berkas virtual + localStorage)
-2. Aplikasi Pengaturan (ganti wallpaper, tema terang/gelap)
+1. Aplikasi Files (penjelajah berkas virtual + localStorage) — selesai 26 Okt 2026
+2. Aplikasi Pengaturan (ganti wallpaper, tema terang/gelap) — selesai 26 Okt 2026
 3. Notifikasi & pusat kontrol di taskbar
 4. Musik/video player mini
 5. Terminal web (perintah semu: help, about, echo, date)
@@ -60,6 +64,6 @@ Urutan pembangunan berikutnya (satu item per jadwal build):
 index.html        — shell: wallpaper, ikon desktop, taskbar, menu Start
 login.html        — halaman login (akun lokal perangkat) + kunci desktop
 css/style.css     — seluruh tampilan desktop & aplikasi
-js/desktop.js     — window manager (drag, minimize, focus, taskbar, jam WIB)
-js/apps.js        — aplikasi bawaan (obrolan, peramban, catatan, kalkulator)
+js/desktop.js     — window manager (drag, minimize, focus, taskbar, jam WIB, terapkan pengaturan tersimpan)
+js/apps.js        — aplikasi bawaan (obrolan, peramban, catatan, kalkulator, files, pengaturan)
 ```

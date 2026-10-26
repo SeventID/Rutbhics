@@ -169,5 +169,17 @@
     });
   } catch (e) {}
 
+  // Pengaturan tersimpan (diatur lewat aplikasi Pengaturan): wallpaper & tema.
+  try {
+    var wallEl = document.getElementById("wallpaper");
+    var savedWp = localStorage.getItem("wd-wallpaper");
+    if (wallEl && savedWp && window.WALLPAPERS && window.WALLPAPERS[savedWp]) {
+      wallEl.style.background = window.WALLPAPERS[savedWp].bg;
+    }
+    if (localStorage.getItem("wd-theme") === "light") {
+      document.body.classList.add("light-theme");
+    }
+  } catch (e) {}
+
   renderLaunchers("");
 })();
