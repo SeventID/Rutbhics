@@ -1,5 +1,5 @@
-// Web Desktop — aplikasi bawaan: Obrolan, Peramban, Catatan, Kalkulator, Files, Pengaturan.
-// Data Obrolan, Catatan & Files tersimpan di localStorage perangkat yang membuka web ini.
+// Web Desktop — aplikasi bawaan: Obrolan, Peramban, Catatan, Kalkulator, Files, Pengaturan, Musik.
+// Data Obrolan, Catatan, Files & Musik tersimpan di localStorage perangkat yang membuka web ini.
 (function () {
   "use strict";
 
@@ -353,12 +353,181 @@
     body.appendChild(el('<p class="hint">Pengaturan tersimpan di perangkat ini dan langsung diterapkan saat desktop dibuka lagi.</p>'));
   }
 
+  // ---------- Musik (player audio & video mini) ----------
+  // Trek demo diputar dari URL publik (butuh internet). Trek tambahan
+  // (URL audio/video apa pun) tersimpan di localStorage perangkat.
+  var DEMO_TRACKS = [
+    { title: "SoundHelix Song 1 (demo)", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3", type: "audio" },
+    { title: "SoundHelix Song 2 (demo)", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3", type: "audio" },
+    { title: "Flower — demo video (MDN)", url: "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4", type: "video" }
+  ];
+  function guessType(url) {
+    var u = url.split("?")[0].toLowerCase();
+    if (/\.(mp4|webm|mov|mkv)$/.test(u)) return "video";
+    return "audio";
+  }
+  function fmtTime(s) {
+    if (!isFinite(s)) return "0:00";
+    var m = Math.floor(s / 60), sec = Math.floor(s % 60);
+    return m + ":" + (sec < 10 ? "0" : "") + sec;
+  }
+  function renderMusic(body) {
+    var custom = store("wd-music", []);
+    if (!Array.isArray(custom)) custom = [];
+    var tracks = DEMO_TRACKS.concat(custom);
+    var current = 0;
+    var media = null; // elemen <audio> atau <video> yang sedang aktif
+
+    var stage = el('<div class="music-stage"></div>');
+    var titleEl = el('<p class="music-title"></p>');
+    var audioEl = el('<audio class="music-media" preload="metadata"></audio>');
+    var videoEl = el('<video class="music-media hidden" preload="metadata"></video>');
+    stage.appendChild(titleEl);
+    stage.appendChild(audioEl);
+    stage.appendChild(videoEl);
+    var errEl = el('<p class="music-error hidden"></p>');
+    stage.appendChild(errEl);
+
+    var controls = el('<div class="music-controls"></div>');
+    var prevBtn = el('<button class="chip">⏮</button>');
+    var playBtn = el('<button class="btn-primary">▶ Putar</button>');
+    var nextBtn = el('<button class="chip">⏭</button>');
+    var timeEl = el('<span class="music-time">0:00 / 0:00</span>');
+    controls.appendChild(prevBtn); controls.appendChild(playBtn);
+    controls.appendChild(nextBtn); controls.appendChild(timeEl);
+
+    var seek = el('<input class="music-seek" type="range" min="0" max="100" value="0">');
+    var volRow = el('<div class="music-volrow"></div>');
+    var volLabel = el('<span class="hint" style="margin:0">Volume</span>');
+    var vol = el('<input class="music-vol" type="range" min="0" max="100" value="80">');
+    volRow.appendChild(volLabel); volRow.appendChild(vol);
+
+    var listEl = el('<div class="music-list"></div>');
+
+    var addRow = el('<div class="music-add"></div>');
+    var urlInput = el('<input type="text" placeholder="Tempel URL audio/video, mis. https://.../lagu.mp3">');
+    var addBtn = el('<button class="btn-primary">Tambah</button>');
+    addRow.appendChild(urlInput); addRow.appendChild(addBtn);
+
+    body.appendChild(stage); body.appendChild(controls);
+    body.appendChild(seek); body.appendChild(volRow);
+    body.appendChild(listEl); body.appendChild(addRow);
+    body.appendChild(el('<p class="hint">Trek demo butuh internet. Trek tambahan tersimpan di perangkat ini.</p>'));
+
+    function currentTrack() { return tracks[current]; }
+    function tryPlay() {
+      if (!media) return;
+      try {
+        var p = media.play();
+        if (p && p.then) {
+          p.then(function () { playBtn.textContent = "⏸ Jeda"; }).catch(function () {});
+        } else {
+          playBtn.textContent = "⏸ Jeda";
+        }
+      } catch (e) { /* abaikan: pengguna bisa menekan Putar */ }
+    }
+    function setMedia() {
+      audioEl.pause();
+      videoEl.pause();
+      var t = currentTrack();
+      var isVideo = t.type === "video";
+      audioEl.classList.toggle("hidden", isVideo);
+      videoEl.classList.toggle("hidden", !isVideo);
+      media = isVideo ? videoEl : audioEl;
+      media.src = t.url;
+      media.volume = vol.value / 100;
+      titleEl.textContent = (isVideo ? "🎬 " : "🎵 ") + t.title;
+      errEl.classList.add("hidden");
+      playBtn.textContent = "▶ Putar";
+      seek.value = 0;
+      timeEl.textContent = "0:00 / 0:00";
+      drawList();
+    }
+    function playTrack(i) {
+      current = (i + tracks.length) % tracks.length;
+      setMedia();
+      tryPlay();
+    }
+    function drawList() {
+      listEl.innerHTML = "";
+      tracks.forEach(function (t, i) {
+        var row = el('<div class="music-row' + (i === current ? " active" : "") + '"></div>');
+        var name = el('<button class="music-name"></button>');
+        name.textContent = (t.type === "video" ? "🎬 " : "🎵 ") + t.title;
+        name.addEventListener("click", function () { playTrack(i); });
+        row.appendChild(name);
+        if (i >= DEMO_TRACKS.length) {
+          var del = el('<button class="chip">Hapus</button>');
+          del.addEventListener("click", function () {
+            custom = custom.filter(function (c) { return c.url !== t.url; });
+            save("wd-music", custom);
+            tracks = DEMO_TRACKS.concat(custom);
+            if (current >= tracks.length) current = tracks.length - 1;
+            setMedia();
+          });
+          row.appendChild(del);
+        }
+        listEl.appendChild(row);
+      });
+    }
+    function bindMediaEvents(m) {
+      m.addEventListener("timeupdate", function () {
+        if (m.duration) seek.value = Math.floor(m.currentTime / m.duration * 100);
+        timeEl.textContent = fmtTime(m.currentTime) + " / " + fmtTime(m.duration);
+      });
+      m.addEventListener("loadedmetadata", function () {
+        timeEl.textContent = fmtTime(m.currentTime) + " / " + fmtTime(m.duration);
+      });
+      m.addEventListener("ended", function () { playTrack(current + 1); });
+      m.addEventListener("error", function () {
+        errEl.textContent = "Gagal memuat media ini. Periksa URL atau koneksi internet, lalu coba trek lain.";
+        errEl.classList.remove("hidden");
+        playBtn.textContent = "▶ Putar";
+      });
+    }
+    bindMediaEvents(audioEl);
+    bindMediaEvents(videoEl);
+
+    playBtn.addEventListener("click", function () {
+      if (!media) return;
+      if (media.paused) {
+        tryPlay();
+      } else {
+        media.pause();
+        playBtn.textContent = "▶ Putar";
+      }
+    });
+    prevBtn.addEventListener("click", function () { playTrack(current - 1); });
+    nextBtn.addEventListener("click", function () { playTrack(current + 1); });
+    seek.addEventListener("input", function () {
+      if (media && media.duration) media.currentTime = seek.value / 100 * media.duration;
+    });
+    vol.addEventListener("input", function () {
+      if (media) media.volume = vol.value / 100;
+    });
+    addBtn.addEventListener("click", function () {
+      var url = urlInput.value.trim();
+      if (!url) return;
+      var title = url.split("/").pop().split("?")[0] || url;
+      try { title = decodeURIComponent(title); } catch (e) {}
+      custom.push({ title: title, url: url, type: guessType(url) });
+      save("wd-music", custom);
+      tracks = DEMO_TRACKS.concat(custom);
+      urlInput.value = "";
+      drawList();
+    });
+    urlInput.addEventListener("keydown", function (e) { if (e.key === "Enter") addBtn.click(); });
+
+    setMedia();
+  }
+
   window.APPS = {
     chat: { emoji: "💬", title: "Obrolan", render: renderChat },
     browser: { emoji: "🌐", title: "Peramban", render: renderBrowser },
     notes: { emoji: "📝", title: "Catatan", render: renderNotes },
     calc: { emoji: "🧮", title: "Kalkulator", render: renderCalc },
     files: { emoji: "📁", title: "Files", render: renderFiles },
-    settings: { emoji: "⚙️", title: "Pengaturan", render: renderSettings }
+    settings: { emoji: "⚙️", title: "Pengaturan", render: renderSettings },
+    music: { emoji: "🎵", title: "Musik", render: renderMusic }
   };
 })();

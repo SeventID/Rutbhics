@@ -51,6 +51,10 @@ Nginx, atau hosting statis apa pun) — tidak butuh backend.
   tersimpan di `localStorage`.
 - **Pengaturan** — ganti wallpaper (4 pilihan) dan tema terang/gelap,
   tersimpan di `localStorage` dan diterapkan saat desktop dibuka lagi.
+- **Musik** — player audio & video mini: putar/jeda, trek sebelum/
+  sesudah, geser posisi, volume, daftar putar. Trek demo dari URL publik
+  (butuh internet); trek tambahan (URL audio/video apa pun) bisa
+  ditambahkan dan tersimpan di `localStorage`.
 
 ## Notifikasi & pusat kontrol (taskbar)
 
@@ -71,7 +75,7 @@ Urutan pembangunan berikutnya (satu item per jadwal build):
 1. Aplikasi Files (penjelajah berkas virtual + localStorage) — selesai 26 Okt 2026
 2. Aplikasi Pengaturan (ganti wallpaper, tema terang/gelap) — selesai 26 Okt 2026
 3. Notifikasi & pusat kontrol di taskbar — selesai 26 Okt 2026
-4. Musik/video player mini
+4. Musik/video player mini — selesai 26 Okt 2026
 5. Terminal web (perintah semu: help, about, echo, date)
 6. Mode jendela maximize + snap kiri/kanan
 7. Aplikasi Gambar (kanvas coret-coret + simpan)
@@ -88,7 +92,7 @@ index.html        — shell: wallpaper, ikon desktop, taskbar, menu Start, panel
 login.html        — halaman login (akun lokal perangkat) + kunci desktop
 css/style.css     — seluruh tampilan desktop & aplikasi
 js/desktop.js     — window manager (drag, minimize, focus, taskbar, jam WIB, terapkan pengaturan tersimpan, notifikasi & pusat kontrol)
-js/apps.js        — aplikasi bawaan (obrolan, peramban, catatan, kalkulator, files, pengaturan)
+js/apps.js        — aplikasi bawaan (obrolan, peramban, catatan, kalkulator, files, pengaturan, musik)
 package.json      — metadata package npm + perintah `rutbhics`
 bin/rutbhics.js   — server statis lokal (tanpa dependensi) untuk perintah `rutbhics`
 ```
