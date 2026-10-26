@@ -13,6 +13,17 @@ python3 -m http.server 8000
 # lalu buka http://localhost:8000
 ```
 
+## Install lewat npm
+
+```bash
+npm install -g rutbhics
+rutbhics
+# lalu buka http://localhost:8080
+```
+
+Port bisa diubah: `rutbhics --port 3000` atau `PORT=3000 rutbhics`.
+Tanpa install permanen: `npx rutbhics`.
+
 ## Login & penggunaan sebagai server
 
 Rutbhics bisa dijalankan sebagai server web statis (mis. `python3 -m http.server`,
@@ -66,4 +77,6 @@ login.html        — halaman login (akun lokal perangkat) + kunci desktop
 css/style.css     — seluruh tampilan desktop & aplikasi
 js/desktop.js     — window manager (drag, minimize, focus, taskbar, jam WIB, terapkan pengaturan tersimpan)
 js/apps.js        — aplikasi bawaan (obrolan, peramban, catatan, kalkulator, files, pengaturan)
+package.json      — metadata package npm + perintah `rutbhics`
+bin/rutbhics.js   — server statis lokal (tanpa dependensi) untuk perintah `rutbhics`
 ```
