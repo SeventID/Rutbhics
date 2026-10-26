@@ -1,0 +1,176 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0b1120;
+  --surface: rgba(19, 28, 49, .92);
+  --surface-solid: #131c31;
+  --ink: #e5eaf4;
+  --muted: #94a3b8;
+  --accent: #6366f1;
+  --accent-2: #22d3ee;
+  --border: rgba(255, 255, 255, .12);
+  --radius: 14px;
+}
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--ink);
+  background: var(--bg);
+  user-select: none;
+}
+button { font: inherit; cursor: pointer; }
+input, textarea { font: inherit; color: var(--ink); }
+
+/* Wallpaper */
+#wallpaper {
+  position: fixed; inset: 0; z-index: 0;
+  background:
+    radial-gradient(600px 400px at 20% 15%, rgba(99, 102, 241, .45), transparent 60%),
+    radial-gradient(700px 500px at 85% 80%, rgba(34, 211, 238, .30), transparent 60%),
+    linear-gradient(160deg, #0f172a, #1e1b4b 55%, #0b1120);
+}
+#wallpaper::after {
+  content: ""; position: absolute; inset: 0; opacity: .12;
+  background-image: radial-gradient(rgba(255,255,255,.7) 1px, transparent 1px);
+  background-size: 26px 26px;
+}
+
+/* Ikon desktop */
+#desktop-icons {
+  position: fixed; z-index: 1; top: 16px; left: 16px;
+  display: flex; flex-direction: column; gap: 18px;
+}
+.desk-icon {
+  width: 76px; border: 0; background: transparent; color: var(--ink);
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 8px 4px; border-radius: 10px;
+}
+.desk-icon:hover { background: rgba(255, 255, 255, .12); }
+.desk-icon .emoji { font-size: 32px; line-height: 1; }
+.desk-icon span { font-size: 12px; text-shadow: 0 1px 4px #000; }
+
+/* Jendela */
+.window {
+  position: fixed; z-index: 10; display: flex; flex-direction: column;
+  width: 640px; height: 440px; min-width: 320px; min-height: 240px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: 0 24px 60px rgba(0, 0, 0, .55);
+  overflow: hidden; backdrop-filter: blur(8px);
+}
+.window.hidden-win { display: none; }
+.win-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; background: rgba(255, 255, 255, .06);
+  cursor: grab; touch-action: none;
+}
+.win-header:active { cursor: grabbing; }
+.win-title { flex: 1; font-weight: 600; font-size: 14px; }
+.win-btn {
+  width: 30px; height: 28px; border: 0; border-radius: 8px;
+  background: rgba(255, 255, 255, .08); color: var(--ink); font-size: 14px;
+}
+.win-btn:hover { background: rgba(255, 255, 255, .2); }
+.win-btn.close:hover { background: #ef4444; }
+.win-body { flex: 1; overflow: auto; padding: 14px; user-select: text; }
+
+/* Taskbar */
+#taskbar {
+  position: fixed; z-index: 100; left: 0; right: 0; bottom: 0;
+  height: 52px; display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px; background: rgba(11, 17, 32, .9);
+  border-top: 1px solid var(--border); backdrop-filter: blur(10px);
+}
+#start-btn {
+  border: 0; border-radius: 10px; padding: 8px 14px;
+  background: var(--accent); color: #fff; font-weight: 700;
+}
+#start-btn:hover { filter: brightness(1.15); }
+#task-buttons { flex: 1; display: flex; gap: 6px; overflow-x: auto; }
+.task-btn {
+  border: 1px solid transparent; border-radius: 10px; padding: 8px 12px;
+  background: transparent; color: var(--ink); white-space: nowrap; font-size: 13px;
+}
+.task-btn:hover { background: rgba(255, 255, 255, .1); }
+.task-btn.active { background: rgba(255, 255, 255, .16); border-color: var(--border); }
+#tray { display: flex; flex-direction: column; align-items: flex-end; font-size: 12px; line-height: 1.3; }
+#clock-time { font-weight: 700; }
+#clock-date { color: var(--muted); }
+
+/* Menu Start */
+#start-menu {
+  position: fixed; z-index: 99; left: 10px; bottom: 60px; width: 340px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px; box-shadow: 0 24px 60px rgba(0, 0, 0, .55);
+}
+#start-menu.hidden { display: none; }
+#start-search {
+  width: 100%; padding: 10px 12px; border-radius: 10px;
+  border: 1px solid var(--border); background: rgba(255, 255, 255, .06); outline: none;
+}
+#start-search:focus { border-color: var(--accent); }
+#start-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
+.start-app {
+  border: 0; border-radius: 12px; padding: 14px 6px;
+  background: transparent; color: var(--ink);
+  display: flex; flex-direction: column; gap: 6px; align-items: center; font-size: 12px;
+}
+.start-app:hover { background: rgba(255, 255, 255, .1); }
+.start-app .emoji { font-size: 26px; }
+
+/* Aplikasi: Chat */
+.chat-wrap { display: flex; gap: 12px; height: 100%; min-height: 300px; }
+.chat-contacts { width: 150px; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; }
+.chat-contact {
+  border: 1px solid transparent; border-radius: 10px; padding: 10px;
+  background: transparent; color: var(--ink); text-align: left; font-size: 13px;
+}
+.chat-contact.active { background: rgba(99, 102, 241, .25); border-color: var(--border); }
+.chat-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.chat-msgs { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 4px; }
+.msg { max-width: 80%; padding: 8px 12px; border-radius: 14px; font-size: 14px; line-height: 1.4; }
+.msg.me { align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
+.msg.them { align-self: flex-start; background: rgba(255, 255, 255, .1); border-bottom-left-radius: 4px; }
+.chat-input { display: flex; gap: 8px; margin-top: 10px; }
+.chat-input input {
+  flex: 1; padding: 10px 12px; border-radius: 10px;
+  border: 1px solid var(--border); background: rgba(255, 255, 255, .06); outline: none;
+}
+.btn-primary {
+  border: 0; border-radius: 10px; padding: 10px 16px;
+  background: var(--accent); color: #fff; font-weight: 600;
+}
+.btn-primary:hover { filter: brightness(1.15); }
+
+/* Aplikasi: Browser */
+.browser-bar { display: flex; gap: 8px; margin-bottom: 10px; }
+.browser-bar input {
+  flex: 1; padding: 10px 12px; border-radius: 10px;
+  border: 1px solid var(--border); background: rgba(255, 255, 255, .06); outline: none;
+}
+.browser-frame { width: 100%; height: 340px; border: 1px solid var(--border); border-radius: 10px; background: #fff; }
+.quick-links { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.chip {
+  border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px;
+  background: transparent; color: var(--ink); font-size: 12px;
+}
+.chip:hover { background: rgba(255, 255, 255, .1); }
+.hint { color: var(--muted); font-size: 12px; margin-top: 8px; line-height: 1.5; }
+
+/* Aplikasi: Catatan & Kalkulator */
+.notes-area {
+  width: 100%; height: 300px; padding: 12px; border-radius: 10px;
+  border: 1px solid var(--border); background: rgba(255, 255, 255, .06);
+  outline: none; resize: vertical; line-height: 1.5;
+}
+.calc-display {
+  width: 100%; padding: 14px; margin-bottom: 10px; text-align: right;
+  font-size: 26px; font-weight: 700; border-radius: 10px;
+  border: 1px solid var(--border); background: rgba(0, 0, 0, .3); min-height: 56px;
+}
+.calc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.calc-grid button {
+  padding: 14px 0; border-radius: 10px; border: 1px solid var(--border);
+  background: rgba(255, 255, 255, .07); color: var(--ink); font-size: 16px;
+}
+.calc-grid button:hover { background: rgba(255, 255, 255, .15); }
+.calc-grid button.op { background: rgba(99, 102, 241, .3); }
+.calc-grid button.eq { background: var(--accent); color: #fff; }

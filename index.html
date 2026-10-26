@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rutbhics</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="wallpaper"></div>
+
+<!-- Ikon desktop -->
+<div id="desktop-icons"></div>
+
+<!-- Jendela -->
+<div id="windows"></div>
+
+<!-- Menu Start -->
+<div id="start-menu" class="hidden">
+  <input id="start-search" type="text" placeholder="Cari aplikasi...">
+  <div id="start-grid"></div>
+</div>
+
+<!-- Taskbar -->
+<footer id="taskbar">
+  <button id="start-btn" title="Mulai">⊞ <span>Mulai</span></button>
+  <div id="task-buttons"></div>
+  <div id="tray">
+    <span id="clock-time">--:--</span>
+    <span id="clock-date">--</span>
+  </div>
+</footer>
+
+<script src="js/desktop.js"></script>
+<script src="js/apps.js"></script>
+</body>
+</html>
