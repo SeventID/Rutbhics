@@ -181,5 +181,134 @@
     }
   } catch (e) {}
 
+  // ---------- Notifikasi & pusat kontrol (taskbar) ----------
+  // Notifikasi tersimpan di localStorage (wd-notifs); mode jangan-ganggu di wd-dnd.
+  function notifStore(fallback) {
+    try {
+      var raw = localStorage.getItem("wd-notifs");
+      return raw ? JSON.parse(raw) : fallback;
+    } catch (e) { return fallback; }
+  }
+  function notifSave(list) {
+    try { localStorage.setItem("wd-notifs", JSON.stringify(list)); } catch (e) { /* abaikan */ }
+  }
+  var notifs = notifStore([]);
+  function isDnd() {
+    try { return localStorage.getItem("wd-dnd") === "1"; } catch (e) { return false; }
+  }
+  function timeWIB() {
+    return new Intl.DateTimeFormat("id-ID", {
+      timeZone: "Asia/Jakarta", hour: "2-digit", minute: "2-digit", hour12: false
+    }).format(new Date());
+  }
+  var notifBtn = document.getElementById("notif-btn");
+  var notifBadge = document.getElementById("notif-badge");
+  var notifPanel = document.getElementById("notif-panel");
+  var notifListEl = document.getElementById("notif-list");
+  var toastWrap = document.getElementById("toast-wrap");
+
+  function unreadCount() {
+    return notifs.filter(function (n) { return !n.read; }).length;
+  }
+  function drawNotifs() {
+    var unread = unreadCount();
+    if (unread > 0) {
+      notifBadge.textContent = unread > 9 ? "9+" : String(unread);
+      notifBadge.classList.remove("hidden");
+    } else {
+      notifBadge.classList.add("hidden");
+    }
+    notifListEl.innerHTML = "";
+    if (!notifs.length) {
+      var empty = document.createElement("p");
+      empty.className = "hint";
+      empty.textContent = "Belum ada notifikasi.";
+      notifListEl.appendChild(empty);
+      return;
+    }
+    notifs.slice().reverse().forEach(function (n) {
+      var row = document.createElement("div");
+      row.className = "notif-item" + (n.read ? "" : " unread");
+      var t = document.createElement("span");
+      t.className = "notif-text";
+      t.textContent = n.text;
+      var time = document.createElement("span");
+      time.className = "notif-time";
+      time.textContent = n.time;
+      row.appendChild(t);
+      row.appendChild(time);
+      notifListEl.appendChild(row);
+    });
+  }
+  function showToast(text) {
+    var toast = document.createElement("div");
+    toast.className = "toast";
+    toast.textContent = text;
+    toast.addEventListener("click", function () { toast.remove(); });
+    toastWrap.appendChild(toast);
+    setTimeout(function () { toast.remove(); }, 4000);
+  }
+  function pushNotif(text, opts) {
+    opts = opts || {};
+    notifs.push({ text: text, time: timeWIB(), read: false });
+    if (notifs.length > 30) notifs = notifs.slice(-30);
+    notifSave(notifs);
+    drawNotifs();
+    if (!opts.silent && !isDnd()) showToast(text);
+  }
+  function markAllRead() {
+    notifs.forEach(function (n) { n.read = true; });
+    notifSave(notifs);
+    drawNotifs();
+  }
+  notifBtn.addEventListener("click", function () {
+    var willOpen = notifPanel.classList.contains("hidden");
+    notifPanel.classList.toggle("hidden");
+    startMenu.classList.add("hidden");
+    if (willOpen) markAllRead();
+  });
+  document.addEventListener("click", function (e) {
+    if (!notifPanel.classList.contains("hidden") &&
+        !e.target.closest("#notif-panel") && !e.target.closest("#notif-btn")) {
+      notifPanel.classList.add("hidden");
+    }
+  });
+  document.getElementById("notif-clear").addEventListener("click", function () {
+    notifs = [];
+    notifSave(notifs);
+    drawNotifs();
+  });
+  var ccTheme = document.getElementById("cc-theme");
+  function refreshThemeBtn() {
+    ccTheme.textContent = document.body.classList.contains("light-theme")
+      ? "🌙 Ganti ke gelap" : "☀️ Ganti ke terang";
+  }
+  ccTheme.addEventListener("click", function () {
+    var light = document.body.classList.toggle("light-theme");
+    try { localStorage.setItem("wd-theme", light ? "light" : "dark"); } catch (e) {}
+    refreshThemeBtn();
+  });
+  var ccDnd = document.getElementById("cc-dnd");
+  function refreshDndBtn() {
+    ccDnd.textContent = isDnd() ? "🔕 Jangan ganggu: aktif" : "🔔 Jangan ganggu: nonaktif";
+  }
+  ccDnd.addEventListener("click", function () {
+    try { localStorage.setItem("wd-dnd", isDnd() ? "0" : "1"); } catch (e) {}
+    refreshDndBtn();
+  });
+  document.getElementById("cc-settings").addEventListener("click", function () {
+    notifPanel.classList.add("hidden");
+    openApp("settings");
+  });
+  document.getElementById("cc-test").addEventListener("click", function () {
+    pushNotif("Ini notifikasi tes dari pusat kontrol.");
+  });
+  refreshThemeBtn();
+  refreshDndBtn();
+  drawNotifs();
+  if (!notifs.length) {
+    pushNotif("Selamat datang di Rutbhics! Ketuk lonceng di taskbar untuk notifikasi & pusat kontrol.");
+  }
+
   renderLaunchers("");
 })();

@@ -35,13 +35,35 @@
 <footer id="taskbar">
   <button id="start-btn" title="Mulai">⊞ <span>Mulai</span></button>
   <div id="task-buttons"></div>
+  <button id="notif-btn" title="Notifikasi & pusat kontrol">🔔<span id="notif-badge" class="hidden">0</span></button>
   <div id="tray">
     <span id="clock-time">--:--</span>
     <span id="clock-date">--</span>
   </div>
 </footer>
 
-<script src="js/desktop.js"></script>
+<!-- Panel notifikasi & pusat kontrol -->
+<div id="notif-panel" class="hidden">
+  <div class="notif-panel-head">
+    <strong>Notifikasi</strong>
+    <button id="notif-clear" class="chip">Hapus semua</button>
+  </div>
+  <div id="notif-list"></div>
+  <div class="notif-panel-head" style="margin-top:14px">
+    <strong>Pusat kontrol</strong>
+  </div>
+  <div class="control-row">
+    <button id="cc-theme" class="chip">☀️ Ganti ke terang</button>
+    <button id="cc-dnd" class="chip">🔔 Jangan ganggu: nonaktif</button>
+  </div>
+  <div class="control-row">
+    <button id="cc-settings" class="btn-primary">Buka Pengaturan</button>
+    <button id="cc-test" class="chip">Kirim notifikasi tes</button>
+  </div>
+</div>
+<div id="toast-wrap"></div>
+
 <script src="js/apps.js"></script>
+<script src="js/desktop.js"></script>
 </body>
 </html>

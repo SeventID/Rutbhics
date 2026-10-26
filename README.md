@@ -52,13 +52,25 @@ Nginx, atau hosting statis apa pun) — tidak butuh backend.
 - **Pengaturan** — ganti wallpaper (4 pilihan) dan tema terang/gelap,
   tersimpan di `localStorage` dan diterapkan saat desktop dibuka lagi.
 
+## Notifikasi & pusat kontrol (taskbar)
+
+- Tombol lonceng 🔔 di taskbar dengan badge jumlah notifikasi belum dibaca.
+- Panel notifikasi: daftar notifikasi (waktu WIB), hapus semua, dan
+  otomatis tandai sudah dibaca saat panel dibuka. Notifikasi tersimpan di
+  `localStorage`, maksimal 30 terbaru.
+- Pusat kontrol di panel yang sama: ganti tema terang/gelap (tersambung ke
+  Pengaturan lewat `localStorage`), mode Jangan Ganggu (mematikan toast
+  pop-up), tombol buka Pengaturan, dan tombol kirim notifikasi tes.
+- Toast pop-up muncul tiap notifikasi baru (kecuali mode Jangan Ganggu
+  aktif), hilang sendiri setelah 4 detik atau saat diklik.
+
 ## Peta jalan (roadmap)
 
 Urutan pembangunan berikutnya (satu item per jadwal build):
 
 1. Aplikasi Files (penjelajah berkas virtual + localStorage) — selesai 26 Okt 2026
 2. Aplikasi Pengaturan (ganti wallpaper, tema terang/gelap) — selesai 26 Okt 2026
-3. Notifikasi & pusat kontrol di taskbar
+3. Notifikasi & pusat kontrol di taskbar — selesai 26 Okt 2026
 4. Musik/video player mini
 5. Terminal web (perintah semu: help, about, echo, date)
 6. Mode jendela maximize + snap kiri/kanan
@@ -72,10 +84,10 @@ Urutan pembangunan berikutnya (satu item per jadwal build):
 ## Struktur
 
 ```
-index.html        — shell: wallpaper, ikon desktop, taskbar, menu Start
+index.html        — shell: wallpaper, ikon desktop, taskbar, menu Start, panel notifikasi & pusat kontrol
 login.html        — halaman login (akun lokal perangkat) + kunci desktop
 css/style.css     — seluruh tampilan desktop & aplikasi
-js/desktop.js     — window manager (drag, minimize, focus, taskbar, jam WIB, terapkan pengaturan tersimpan)
+js/desktop.js     — window manager (drag, minimize, focus, taskbar, jam WIB, terapkan pengaturan tersimpan, notifikasi & pusat kontrol)
 js/apps.js        — aplikasi bawaan (obrolan, peramban, catatan, kalkulator, files, pengaturan)
 package.json      — metadata package npm + perintah `rutbhics`
 bin/rutbhics.js   — server statis lokal (tanpa dependensi) untuk perintah `rutbhics`
