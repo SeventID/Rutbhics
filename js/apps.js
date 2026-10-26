@@ -1,5 +1,5 @@
-// Web Desktop — aplikasi bawaan v1: Obrolan, Peramban, Catatan, Kalkulator.
-// Data Obrolan & Catatan tersimpan di localStorage perangkat yang membuka web ini.
+// Web Desktop — aplikasi bawaan: Obrolan, Peramban, Catatan, Kalkulator, Files.
+// Data Obrolan, Catatan & Files tersimpan di localStorage perangkat yang membuka web ini.
 (function () {
   "use strict";
 
@@ -160,10 +160,124 @@
     body.appendChild(disp); body.appendChild(grid);
   }
 
+  // ---------- Files (penjelajah berkas virtual, data lokal) ----------
+  // Struktur: { name, type: "folder"|"file", children: [], content: "" }
+  function defaultFS() {
+    return {
+      name: "", type: "folder", children: [
+        { name: "Dokumen", type: "folder", children: [
+          { name: "Selamat datang.txt", type: "file",
+            content: "Selamat datang di Files Rutbhics!\n\nIni penjelajah berkas virtual: folder dan berkas teks yang kamu buat tersimpan di perangkat ini (localStorage), jadi tetap ada saat halaman dibuka lagi.\n\nCoba: buat folder baru, buat berkas baru, buka berkas untuk mengedit isinya, atau hapus yang tidak perlu." },
+          { name: "Tentang Rutbhics.txt", type: "file",
+            content: "Rutbhics adalah aplikasi desktop di dalam browser.\nDibangun dengan HTML, CSS, dan JavaScript murni — tanpa framework." }
+        ]},
+        { name: "Gambar", type: "folder", children: [] },
+        { name: "Musik", type: "folder", children: [] }
+      ]
+    };
+  }
+  function renderFiles(body) {
+    var root = store("wd-files", null) || defaultFS();
+    if (!root.children) root = defaultFS();
+    save("wd-files", root);
+    var path = []; // array nama folder dari root
+    var bar = el('<div class="files-bar"></div>');
+    var pathEl = el('<span class="files-path">/</span>');
+    var upBtn = el('<button class="chip">↑ Naik</button>');
+    var newFolderBtn = el('<button class="btn-primary">Folder Baru</button>');
+    var newFileBtn = el('<button class="btn-primary">Berkas Baru</button>');
+    bar.appendChild(pathEl); bar.appendChild(upBtn);
+    bar.appendChild(newFolderBtn); bar.appendChild(newFileBtn);
+    var listEl = el('<div class="files-list"></div>');
+    var viewEl = el('<div class="files-view"></div>');
+    body.appendChild(bar); body.appendChild(listEl); body.appendChild(viewEl);
+
+    function currentFolder() {
+      var node = root;
+      path.forEach(function (name) {
+        var next = null;
+        node.children.forEach(function (c) {
+          if (c.type === "folder" && c.name === name) next = c;
+        });
+        if (next) node = next;
+      });
+      return node;
+    }
+    function persist() { save("wd-files", root); }
+    function uniqueName(base, folder) {
+      var name = base, i = 2;
+      function exists(n) {
+        return folder.children.some(function (c) { return c.name === n; });
+      }
+      while (exists(name)) { name = base + " (" + i + ")"; i += 1; }
+      return name;
+    }
+    function draw() {
+      var folder = currentFolder();
+      pathEl.textContent = "/" + path.join("/");
+      listEl.innerHTML = "";
+      viewEl.innerHTML = "";
+      if (!folder.children.length) {
+        var empty = el('<p class="hint">Folder ini kosong. Buat folder atau berkas baru dari tombol di atas.</p>');
+        listEl.appendChild(empty);
+        return;
+      }
+      folder.children.forEach(function (item) {
+        var row = el('<div class="file-row"></div>');
+        var icon = el('<span class="file-icon"></span>');
+        icon.textContent = item.type === "folder" ? "📁" : "📄";
+        var nameBtn = el('<button class="file-name"></button>');
+        nameBtn.textContent = item.name;
+        nameBtn.addEventListener("click", function () { openItem(item); });
+        var del = el('<button class="chip">Hapus</button>');
+        del.addEventListener("click", function () {
+          folder.children = folder.children.filter(function (c) { return c !== item; });
+          persist(); draw();
+        });
+        row.appendChild(icon); row.appendChild(nameBtn); row.appendChild(del);
+        listEl.appendChild(row);
+      });
+    }
+    function openItem(item) {
+      if (item.type === "folder") { path.push(item.name); draw(); return; }
+      viewEl.innerHTML = "";
+      var title = el('<p class="files-view-title"></p>');
+      title.textContent = item.name;
+      var area = el('<textarea class="files-editor"></textarea>');
+      area.value = item.content || "";
+      var saveBtn = el('<button class="btn-primary">Simpan</button>');
+      var ok = el('<span class="hint" style="margin-left:10px"></span>');
+      saveBtn.addEventListener("click", function () {
+        item.content = area.value; persist();
+        ok.textContent = "Tersimpan ✓";
+        setTimeout(function () { ok.textContent = ""; }, 2000);
+      });
+      viewEl.appendChild(title); viewEl.appendChild(area);
+      viewEl.appendChild(saveBtn); viewEl.appendChild(ok);
+    }
+    upBtn.addEventListener("click", function () {
+      if (path.length) { path.pop(); draw(); }
+    });
+    newFolderBtn.addEventListener("click", function () {
+      var folder = currentFolder();
+      var name = uniqueName("Folder baru", folder);
+      folder.children.push({ name: name, type: "folder", children: [] });
+      persist(); draw();
+    });
+    newFileBtn.addEventListener("click", function () {
+      var folder = currentFolder();
+      var name = uniqueName("Berkas baru.txt", folder);
+      folder.children.push({ name: name, type: "file", content: "" });
+      persist(); draw();
+    });
+    draw();
+  }
+
   window.APPS = {
     chat: { emoji: "💬", title: "Obrolan", render: renderChat },
     browser: { emoji: "🌐", title: "Peramban", render: renderBrowser },
     notes: { emoji: "📝", title: "Catatan", render: renderNotes },
-    calc: { emoji: "🧮", title: "Kalkulator", render: renderCalc }
+    calc: { emoji: "🧮", title: "Kalkulator", render: renderCalc },
+    files: { emoji: "📁", title: "Files", render: renderFiles }
   };
 })();
