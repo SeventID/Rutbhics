@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Rutbhics</title>
 <link rel="stylesheet" href="css/style.css">
+<script>
+  // Kunci desktop: tanpa sesi login, kembali ke halaman login.
+  try {
+    if (!sessionStorage.getItem("wd-session")) { location.replace("login.html"); }
+  } catch (e) { /* abaikan: kunci demo, bukan pengaman sungguhan */ }
+</script>
 </head>
 <body>
 <div id="wallpaper"></div>
@@ -19,6 +25,10 @@
 <div id="start-menu" class="hidden">
   <input id="start-search" type="text" placeholder="Cari aplikasi...">
   <div id="start-grid"></div>
+  <div id="start-user">
+    <span id="start-username"></span>
+    <button id="logout-btn">Keluar</button>
+  </div>
 </div>
 
 <!-- Taskbar -->

@@ -186,3 +186,19 @@ input, textarea { font: inherit; color: var(--ink); }
 .files-view { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 12px; }
 .files-view-title { font-weight: 600; font-size: 14px; margin-bottom: 8px; }
 .files-editor { width: 100%; height: 180px; padding: 12px; border-radius: 10px; border: 1px solid var(--border); background: rgba(255, 255, 255, .06); outline: none; resize: vertical; line-height: 1.5; margin-bottom: 10px; }
+
+/* Halaman login & pengguna di menu Start */
+.login-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; position: relative; z-index: 1; }
+.login-card { width: 100%; max-width: 360px; background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 28px; box-shadow: 0 24px 60px rgba(0, 0, 0, .55); }
+.login-card h1 { font-size: 28px; margin-bottom: 4px; }
+.login-card p.sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+.login-card label { display: block; font-size: 13px; color: var(--muted); margin: 12px 0 6px; }
+.login-card input { width: 100%; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--border); background: rgba(255, 255, 255, .06); outline: none; }
+.login-card input:focus { border-color: var(--accent); }
+.login-card .btn-primary { width: 100%; margin-top: 18px; }
+.login-error { color: #f87171; font-size: 13px; min-height: 18px; margin-top: 10px; }
+.login-link { background: none; border: 0; color: var(--accent-2); font-size: 13px; margin-top: 14px; }
+.login-link.hidden { display: none; }
+#start-user { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); }
+#logout-btn { border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; background: transparent; color: var(--ink); font-size: 12px; }
+#logout-btn:hover { background: rgba(255, 255, 255, .1); }

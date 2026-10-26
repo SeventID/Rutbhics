@@ -13,6 +13,21 @@ python3 -m http.server 8000
 # lalu buka http://localhost:8000
 ```
 
+## Login & penggunaan sebagai server
+
+Rutbhics bisa dijalankan sebagai server web statis (mis. `python3 -m http.server`,
+Nginx, atau hosting statis apa pun) — tidak butuh backend.
+
+- Buka halaman utama: pengunjung diarahkan ke `login.html`.
+- Kunjungan pertama: buat akun perangkat (nama pengguna + kata sandi).
+  Akun tersimpan lokal di perangkat itu (kata sandi di-hash SHA-256 bila
+  konteks aman, fallback hash sederhana bila tidak).
+- Setelah masuk, desktop terkunci di balik sesi tab itu; keluar lewat
+  tombol **Keluar** di menu Start.
+- Catatan jujur: kunci ini hanya pengaman demo sisi klien, bukan
+  autentikasi server sungguhan. Untuk akun multi-pengguna yang aman,
+  diperlukan backend (mis. Node + database + sesi) di tahap berikutnya.
+
 ## Aplikasi v1
 
 - **Obrolan** — aplikasi chatting gaya WhatsApp (daftar kontak, kirim pesan,
@@ -35,7 +50,7 @@ Urutan pembangunan berikutnya (satu item per jadwal build):
 7. Aplikasi Gambar (kanvas coret-coret + simpan)
 8. Widget jam/kalender di desktop
 9. Mode multi-bahasa (Indonesia/Inggris)
-10. Halaman login/pengguna + profil
+10. Halaman login/pengguna + profil — selesai 26 Okt 2026 (dimajukan atas permintaan langsung)
 
 > Nama proyek: **Rutbhics** (dipilih Kang Mas, 26 Okt 2026).
 
@@ -43,6 +58,7 @@ Urutan pembangunan berikutnya (satu item per jadwal build):
 
 ```
 index.html        — shell: wallpaper, ikon desktop, taskbar, menu Start
+login.html        — halaman login (akun lokal perangkat) + kunci desktop
 css/style.css     — seluruh tampilan desktop & aplikasi
 js/desktop.js     — window manager (drag, minimize, focus, taskbar, jam WIB)
 js/apps.js        — aplikasi bawaan (obrolan, peramban, catatan, kalkulator)

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Masuk — Rutbhics</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="wallpaper"></div>
+<main class="login-page">
+  <section class="login-card">
+    <h1>🖥️ Rutbhics</h1>
+    <p class="sub">Masuk ke desktop.</p>
+    <form id="login-form">
+      <label for="username">Nama pengguna</label>
+      <input id="username" type="text" autocomplete="username" required>
+      <label for="password">Kata sandi</label>
+      <input id="password" type="password" autocomplete="current-password" required>
+      <p id="login-error" class="login-error"></p>
+      <button id="login-btn" class="btn-primary" type="submit">Masuk</button>
+    </form>
+    <button id="reset-account" class="login-link hidden">Ganti akun perangkat (hapus akun ini)</button>
+    <p class="hint">Akun tersimpan lokal di perangkat ini (demo). Ini bukan autentikasi server sungguhan — siapa pun yang memegang berkasnya bisa melewatinya. Untuk autentikasi multi-pengguna sungguhan, perlu backend di tahap berikutnya.</p>
+  </section>
+</main>
+<script>
+(function () {
+  "use strict";
+  var USER_KEY = "wd-user";       // localStorage: { username, passHash }
+  var SESSION_KEY = "wd-session"; // sessionStorage: username
+  var form = document.getElementById("login-form");
+  var userEl = document.getElementById("username");
+  var passEl = document.getElementById("password");
+  var errEl = document.getElementById("login-error");
+  var btn = document.getElementById("login-btn");
+  var resetBtn = document.getElementById("reset-account");
+
+  function loadUser() {
+    try { return JSON.parse(localStorage.getItem(USER_KEY) || "null"); }
+    catch (e) { return null; }
+  }
+  // SHA-256 bila tersedia (konteks aman); fallback FNV-1a bila tidak
+  // (mis. dibuka via http://IP non-localhost). Fallback ini bukan pengaman.
+  function hashPass(pw) {
+    if (window.crypto && crypto.subtle) {
+      return crypto.subtle.digest("SHA-256", new TextEncoder().encode(pw))
+        .then(function (buf) {
+          return Array.prototype.map.call(new Uint8Array(buf), function (b) {
+            return ("0" + b.toString(16)).slice(-2);
+          }).join("");
+        });
+    }
+    var h = 0x811c9dc5;
+    for (var i = 0; i < pw.length; i++) {
+      h ^= pw.charCodeAt(i);
+      h = Math.imul(h, 0x01000193);
+    }
+    return Promise.resolve("fnv-" + (h >>> 0).toString(16));
+  }
+  function fail(msg) { errEl.textContent = msg; }
+
+  try {
+    if (sessionStorage.getItem(SESSION_KEY)) { location.replace("index.html"); return; }
+  } catch (e) {}
+
+  var existing = loadUser();
+  if (!existing) {
+    btn.textContent = "Buat Akun & Masuk";
+    document.querySelector(".login-card .sub").textContent =
+      "Belum ada akun di perangkat ini — akun pertama yang dibuat menjadi akun perangkat ini.";
+  } else {
+    resetBtn.classList.remove("hidden");
+    resetBtn.addEventListener("click", function () {
+      try { localStorage.removeItem(USER_KEY); } catch (e) {}
+      location.reload();
+    });
+  }
+
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var username = userEl.value.trim();
+    var password = passEl.value;
+    if (!username || !password) { fail("Isi nama pengguna dan kata sandi."); return; }
+    errEl.textContent = "";
+    var saved = loadUser();
+    hashPass(password).then(function (hash) {
+      if (!saved) {
+        try { localStorage.setItem(USER_KEY, JSON.stringify({ username: username, passHash: hash })); }
+        catch (err) { fail("Gagal menyimpan akun di perangkat ini."); return; }
+      } else if (saved.username !== username || saved.passHash !== hash) {
+        fail("Nama pengguna atau kata sandi salah."); return;
+      }
+      try { sessionStorage.setItem(SESSION_KEY, username); } catch (err) {}
+      location.href = "index.html";
+    });
+  });
+})();
+</script>
+</body>
+</html>

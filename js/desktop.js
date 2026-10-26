@@ -157,5 +157,17 @@
   tick();
   setInterval(tick, 1000);
 
+  // Sesi login: tampilkan pengguna & tombol keluar di menu Start.
+  try {
+    var sessUser = sessionStorage.getItem("wd-session");
+    var nameEl = document.getElementById("start-username");
+    var logoutBtn = document.getElementById("logout-btn");
+    if (nameEl) nameEl.textContent = sessUser ? "Masuk sebagai " + sessUser : "";
+    if (logoutBtn) logoutBtn.addEventListener("click", function () {
+      try { sessionStorage.removeItem("wd-session"); } catch (e) {}
+      location.href = "login.html";
+    });
+  } catch (e) {}
+
   renderLaunchers("");
 })();
