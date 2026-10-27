@@ -410,6 +410,17 @@
     var logoutBtn = document.getElementById("logout-btn");
     if (nameEl) nameEl.textContent = sessUser ? t("session") + sessUser : "";
     if (logoutBtn) logoutBtn.addEventListener("click", function () {
+      // Cabut juga cookie sesi server bila ada (L7): pakai sendBeacon agar
+      // request tidak gugur saat pindah halaman; fallback fetch keepalive.
+      // Best-effort: gagal = abaikan, logout lokal tetap bersih, tanpa
+      // error ke pengguna.
+      try {
+        if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
+          navigator.sendBeacon("/api/auth/logout");
+        } else if (typeof fetch === "function") {
+          fetch("/api/auth/logout", { method: "POST", keepalive: true }).catch(function () {});
+        }
+      } catch (e) {}
       try { sessionStorage.removeItem("wd-session"); } catch (e) {}
       location.href = "login.html";
     });
