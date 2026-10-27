@@ -1635,7 +1635,15 @@ const server = http.createServer((req, res) => {
       return;
     }
     let filePath = path.normalize(path.join(ROOT, url.pathname));
-    if (!filePath.startsWith(ROOT)) {
+    // R-04 (defense-in-depth): pemeriksaan prefix HARUS exact-or-separator.
+    // startsWith(ROOT) telanjang meloloskan direktori saudara berawalan
+    // nama ROOT (mis. ROOT="/app/pkg", sibling "/app/pkg-evil/...").
+    // Saat ini TIDAK dapat dieksploitasi via HTTP (new URL menormalisasi
+    // segmen dot sebelum handler — FP-01 audit), jadi ini pengerasan,
+    // bukan perbaikan kerentanan live. Cabang === ROOT wajib ada: GET /
+    // menghasilkan filePath === ROOT sebelum dialihkan ke index.html
+    // di bawah (tanpanya, GET / akan 403).
+    if (filePath !== ROOT && !filePath.startsWith(ROOT + path.sep)) {
       res.writeHead(403, Object.assign({ "Content-Type": "text/plain; charset=utf-8" }, securityHeaders()));
       res.end("Forbidden");
       return;
