@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Rutbhics — server lokal, tanpa dependensi.
 // Pakai: rutbhics [--port 8080]  atau  PORT=8080 rutbhics
+//        rutbhics --setup   (tanya & simpan kunci Larprouter ke .env folder kerja)
 // Lalu buka http://localhost:8080 di browser.
 //
 // Selain berkas statis, server ini menyediakan:
@@ -184,6 +185,17 @@ function handleChat(req, res) {
   }).catch(() => { sendJson(res, 400, { error: "body_tidak_valid" }); });
 }
 
+// Perintah setup mandiri: tanya kunci Larprouter, simpan ke .env folder
+// kerja (lokasi permanen yang tidak hilang saat package di-update), lalu
+// berhenti — server tidak dijalankan.
+if (process.argv.includes("--setup")) {
+  try {
+    const setup = require(path.join(__dirname, "..", "scripts", "setup-larprouter.js"));
+    setup.runSetup(path.join(process.cwd(), ".env"));
+  } catch (e) { /* setup tidak pernah menggagalkan perintah */ }
+  process.exit(0);
+}
+
 const port = parsePort(process.argv.slice(2));
 const server = http.createServer((req, res) => {
   try {
@@ -225,6 +237,6 @@ server.listen(port, () => {
   if (API_KEY_CONFIGURED) {
     console.log("Bot AI: aktif (model " + LARPROUTER_MODEL + ")");
   } else {
-    console.log("Bot AI: nonaktif — isi LARPROUTER_API_KEY di .env untuk mengaktifkan Bot Asisten.");
+    console.log("Bot AI: nonaktif — jalankan `rutbhics --setup` atau isi LARPROUTER_API_KEY di .env untuk mengaktifkan AI.");
   }
 });

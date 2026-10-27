@@ -24,6 +24,16 @@ rutbhics
 Port bisa diubah: `rutbhics --port 3000` atau `PORT=3000 rutbhics`.
 Tanpa install permanen: `npx rutbhics`.
 
+Saat install interaktif, installer bertanya: "Apakah Anda punya API
+Larprouter? (y/n)". Jawab `y` lalu masukkan kunci (ketikan disembunyikan)
+maka AI di Obrolan langsung aktif; jawab selain `y` maka install lanjut
+tanpa AI. Instalasi non-interaktif (CI, skrip) dilewati otomatis tanpa
+menghentikan install. Catatan: kunci dari installer tersimpan di `.env`
+folder paket — saat package di-update, folder itu diganti dan kunci bisa
+hilang. Untuk salinan permanen, jalankan `rutbhics --setup` dari folder
+kerjamu (kunci tersimpan di `.env` folder itu, yang selalu dimenangkan
+server atas `.env` folder paket).
+
 ## Login & penggunaan sebagai server
 
 Rutbhics bisa dijalankan sebagai server web statis (mis. `python3 -m http.server`,
