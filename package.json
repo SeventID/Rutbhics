@@ -10,7 +10,8 @@
     "js/",
     "README.md",
     "LICENSE",
-    "bin/"
+    "bin/",
+    ".env.example"
   ],
   "homepage": "https://github.com/SeventID/Rutbhics#readme",
   "license": "MIT",

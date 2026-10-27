@@ -22,9 +22,17 @@
   var CONTACTS = [
     { id: "teman", name: "Teman", hello: "Hai! Lagi ngapain?" },
     { id: "grup", name: "Grup Keluarga", hello: "Selamat datang di grup keluarga!" },
-    { id: "bot", name: "Bot Asisten", hello: "Halo! Aku bot demo. Tulis pesan, nanti aku balas." }
+    { id: "bot", name: "Bot Asisten", hello: "Halo! Aku Bot Asisten Rutbhics. Tulis pesan, nanti aku balas." }
   ];
-  var REPLIES = ["Siap, noted!", "Oke, lanjut!", "Haha, bener juga.", "Menarik, ceritain lagi dong.", "Otw!"];
+  // Persona AI per kontak Obrolan (dikirim sebagai system prompt ke /api/chat).
+  // Catatan jujur: Teman & Grup Keluarga tetap BUKAN orang sungguhan — mereka
+  // adalah persona AI. Chat antar pengguna beneran butuh backend server
+  // (tahap berikutnya, belum dikerjakan).
+  var PERSONAS = {
+    teman: "Kamu adalah Teman, teman akrab pengguna di aplikasi chat Rutbhics. Jawab santai seperti teman mengobrol, singkat, dan dalam Bahasa Indonesia.",
+    grup: "Kamu adalah anggota Grup Keluarga di aplikasi chat Rutbhics. Jawab hangat seperti anggota keluarga yang mengobrol di grup, singkat, dan dalam Bahasa Indonesia.",
+    bot: "Kamu adalah Bot Asisten di desktop Rutbhics. Jawab singkat, jelas, dan dalam Bahasa Indonesia."
+  };
   function renderChat(body) {
     var data = store("wd-chat", {});
     CONTACTS.forEach(function (c) { if (!data[c.id]) data[c.id] = [{ from: "them", text: c.hello }]; });
@@ -37,7 +45,12 @@
     var input = el('<input type="text" placeholder="Tulis pesan...">');
     var send = el('<button class="btn-primary">Kirim</button>');
     inputRow.appendChild(input); inputRow.appendChild(send);
-    mainEl.appendChild(msgsEl); mainEl.appendChild(inputRow);
+    // Hint status AI (semua kontak Obrolan memakai AI Larprouter).
+    // Kunci API tidak pernah ada di browser: browser hanya memanggil
+    // /api/chat di server lokal, kunci dibaca server dari .env.
+    var botHint = "Kontak ini menjawab pakai AI Larprouter bila server lokal rutbhics + .env sudah disiapkan.";
+    var hintEl = el('<p class="hint bot-hint"></p>');
+    mainEl.appendChild(msgsEl); mainEl.appendChild(inputRow); mainEl.appendChild(hintEl);
     wrap.appendChild(listEl); wrap.appendChild(mainEl);
     body.appendChild(wrap);
 
@@ -57,6 +70,40 @@
         msgsEl.appendChild(d);
       });
       msgsEl.scrollTop = msgsEl.scrollHeight;
+      hintEl.textContent = botHint;
+      hintEl.style.display = "";
+    }
+    function pushAI(text) {
+      data[active].push({ from: "them", text: text });
+      save("wd-chat", data);
+      drawMsgs();
+    }
+    // Semua kontak Obrolan -> AI Larprouter lewat proxy server lokal
+    // (/api/chat), masing-masing dengan persona-nya sendiri.
+    function sendToAI() {
+      var history = data[active].slice(-20).map(function (m) {
+        return { role: m.from === "me" ? "user" : "assistant", content: m.text };
+      });
+      if (typeof fetch !== "function") {
+        pushAI("Browser ini tidak mendukung fetch, jadi AI tidak bisa dihubungi.");
+        return;
+      }
+      fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: history, system: PERSONAS[active] })
+      }).then(function (r) {
+        return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; });
+      }).then(function (res) {
+        if (res.ok && res.body && res.body.reply) { pushAI(res.body.reply); }
+        else if (res.body && res.body.error === "bot_ai_tidak_aktif") {
+          pushAI("AI belum aktif: isi LARPROUTER_API_KEY di berkas .env (salin dari .env.example), lalu jalankan ulang rutbhics.");
+        }
+        else if (res.body && res.body.message) { pushAI("AI gagal: " + res.body.message); }
+        else { pushAI("AI gagal dihubungi (status " + res.status + "). Coba lagi nanti."); }
+      }).catch(function () {
+        pushAI("AI hanya jalan lewat server lokal rutbhics (bukan halaman statis). Jalankan `rutbhics` di perangkat ini, pastikan .env sudah diisi, lalu buka lagi.");
+      });
     }
     function sendMsg() {
       var text = input.value.trim();
@@ -65,17 +112,22 @@
       input.value = "";
       save("wd-chat", data);
       drawMsgs();
-      var reply = REPLIES[Math.floor(Math.random() * REPLIES.length)];
-      setTimeout(function () {
-        data[active].push({ from: "them", text: reply });
-        save("wd-chat", data);
-        drawMsgs();
-      }, 900);
+      sendToAI();
     }
     send.addEventListener("click", sendMsg);
     input.addEventListener("keydown", function (e) { if (e.key === "Enter") sendMsg(); });
     drawContacts();
     drawMsgs();
+    // Status AI dari server lokal (diabaikan bila halaman dibuka statis).
+    try {
+      if (typeof fetch === "function") {
+        fetch("/api/chat").then(function (r) { return r.json(); }).then(function (s) {
+          if (s && s.active) botHint = "AI aktif (model " + s.model + ").";
+          else botHint = "AI belum aktif — isi LARPROUTER_API_KEY di .env, lalu jalankan ulang rutbhics.";
+          drawMsgs();
+        }).catch(function () { /* tetap pakai hint bawaan */ });
+      }
+    } catch (e) { /* abaikan */ }
   }
 
   // ---------- Peramban ----------

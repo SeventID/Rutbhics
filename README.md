@@ -76,7 +76,9 @@ Urutan pembangunan berikutnya (satu item per jadwal build):
 2. Aplikasi Pengaturan (ganti wallpaper, tema terang/gelap) — selesai 26 Okt 2026
 3. Notifikasi & pusat kontrol di taskbar — selesai 26 Okt 2026
 4. Musik/video player mini — selesai 26 Okt 2026
-5. Terminal web (perintah semu: help, about, echo, date)
+5. Terminal web (perintah semu: help, about, echo, date) — selesai 26 Okt 2026
+11. Bot AI di Obrolan (Larprouter via proxy lokal + .env) — selesai 26 Okt 2026 (dimajukan atas permintaan langsung)
+12. Chat multi-user beneran (backend server: akun + pesan real-time) — berikutnya, belum dikerjakan
 6. Mode jendela maximize + snap kiri/kanan
 7. Aplikasi Gambar (kanvas coret-coret + simpan)
 8. Widget jam/kalender di desktop
@@ -94,5 +96,36 @@ css/style.css     — seluruh tampilan desktop & aplikasi
 js/desktop.js     — window manager (drag, minimize, focus, taskbar, jam WIB, terapkan pengaturan tersimpan, notifikasi & pusat kontrol)
 js/apps.js        — aplikasi bawaan (obrolan, peramban, catatan, kalkulator, files, pengaturan, musik)
 package.json      — metadata package npm + perintah `rutbhics`
-bin/rutbhics.js   — server statis lokal (tanpa dependensi) untuk perintah `rutbhics`
+bin/rutbhics.js   — server lokal (tanpa dependensi) untuk perintah `rutbhics`, termasuk proxy Bot AI (/api/chat)
+.env.example      — contoh konfigurasi lokal Bot AI (kunci API, base URL, model; tanpa nilai asli)
+.gitignore        — menjaga .env tidak masuk repo
 ```
+
+## Bot AI (Larprouter)
+
+Semua kontak di aplikasi Obrolan (Teman, Grup Keluarga, Bot Asisten) menjawab
+memakai AI Larprouter (OpenAI-compatible), bukan lagi balasan demo acak —
+masing-masing dengan persona-nya sendiri (teman akrab, anggota keluarga,
+asisten). Catatan jujur: mereka tetap persona AI, bukan orang sungguhan;
+chat antar pengguna beneran butuh backend server (tahap berikutnya).
+
+Cara mengaktifkan:
+
+1. Salin `.env.example` menjadi `.env` di folder tempat kamu menjalankan `rutbhics`.
+2. Isi `LARPROUTER_API_KEY` dengan kunci Larprouter-mu.
+3. Jalankan ulang `rutbhics`, buka Obrolan, pilih kontak mana pun.
+
+Catatan:
+
+- Model bawaan `deepseek-v4.1-flash` (model utama `claude-opus-4-7-1m` bisa
+  dipilih lewat `LARPROUTER_MODEL` setelah kreditnya cukup).
+- Kunci tidak pernah masuk repo, tidak pernah dikirim ke browser: browser hanya
+  memanggil `POST /api/chat` di server lokal, kunci dibaca server dari `.env`.
+  Server juga tidak pernah melayani berkas `.env` sebagai berkas statis, dan
+  endpoint `/api/chat` hanya menerima koneksi dari perangkat itu sendiri.
+- Tanpa `.env` (atau bila halaman dibuka sebagai situs statis tanpa server
+  lokal), Bot Asisten memberi tahu cara mengaktifkannya, bukan berpura-pura
+  menjawab pakai AI.
+- Chat multi-user beneran (antar pengguna lewat server) belum ada — itu tahap
+  berikutnya dan butuh backend terpisah.
+
