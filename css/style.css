@@ -73,6 +73,14 @@ input, textarea { font: inherit; color: var(--ink); }
 .win-btn.close:hover { background: #ef4444; }
 .win-body { flex: 1; overflow: auto; padding: 14px; user-select: text; }
 
+/* Gambar */
+.gambar-tools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+.gambar-color { width: 30px; height: 30px; border-radius: 50%; border: 2px solid transparent; padding: 0; }
+.gambar-color.active { border-color: var(--ink); }
+.gambar-btn { border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; background: rgba(255, 255, 255, .08); color: var(--ink); font-size: 13px; }
+.gambar-btn.active { border-color: var(--ink); background: rgba(255, 255, 255, .18); }
+.gambar-canvas { width: 100%; height: auto; display: block; background: #fff; border: 1px solid var(--border); border-radius: 10px; touch-action: none; cursor: crosshair; }
+
 /* Taskbar */
 #taskbar {
   position: fixed; z-index: 100; left: 0; right: 0; bottom: 0;

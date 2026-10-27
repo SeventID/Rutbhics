@@ -1,4 +1,4 @@
-// Web Desktop — aplikasi bawaan: Obrolan, Peramban, Catatan, Kalkulator, Files, Pengaturan, Musik, Terminal.
+// Web Desktop — aplikasi bawaan: Obrolan, Peramban, Catatan, Kalkulator, Files, Pengaturan, Musik, Terminal, Gambar.
 // Data Obrolan, Catatan, Files & Musik tersimpan di localStorage perangkat yang membuka web ini.
 (function () {
   "use strict";
@@ -668,6 +668,130 @@
     input.focus();
   }
 
+  // ---------- Gambar (kanvas coret-coret + simpan) ----------
+  // Gambar tersimpan otomatis di localStorage ("wd-gambar", data URL PNG)
+  // setiap goresan selesai, jadi tidak hilang saat jendela ditutup.
+  // Tombol Unduh menyimpan PNG ke perangkat lewat tautan unduhan.
+  function renderGambar(body) {
+    var wrap = el('<div class="gambar-wrap"></div>');
+    var tools = el('<div class="gambar-tools"></div>');
+    var canvas = document.createElement("canvas");
+    canvas.width = 800;
+    canvas.height = 500;
+    canvas.className = "gambar-canvas";
+    var ctx = canvas.getContext("2d");
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    var status = el('<p class="hint">Gambar tersimpan otomatis di perangkat ini.</p>');
+
+    var color = "#111111";
+    var size = 4;
+    var erasing = false;
+
+    function mkBtn(text, cls) {
+      var b = document.createElement("button");
+      b.className = cls || "gambar-btn";
+      b.textContent = text;
+      tools.appendChild(b);
+      return b;
+    }
+    function markActive(group, active) {
+      group.forEach(function (b) { b.classList.toggle("active", b === active); });
+    }
+    var colorBtns = ["#111111", "#ef4444", "#22c55e", "#3b82f6", "#eab308", "#ffffff"].map(function (c) {
+      var b = document.createElement("button");
+      b.className = "gambar-color";
+      b.style.background = c;
+      b.title = c;
+      b.addEventListener("click", function () {
+        color = c; erasing = false;
+        markActive(colorBtns, b);
+        markActive([eraserBtn], null);
+      });
+      tools.appendChild(b);
+      return b;
+    });
+    markActive(colorBtns, colorBtns[0]);
+    var eraserBtn = mkBtn("🧽 Penghapus", "gambar-btn");
+    eraserBtn.addEventListener("click", function () {
+      erasing = true;
+      markActive(colorBtns, null);
+      markActive([eraserBtn], eraserBtn);
+    });
+    var sizeBtns = [[2, "Tipis"], [5, "Sedang"], [12, "Tebal"]].map(function (s) {
+      var b = mkBtn(s[1], "gambar-btn");
+      b.addEventListener("click", function () {
+        size = s[0];
+        markActive(sizeBtns, b);
+      });
+      return b;
+    });
+    markActive(sizeBtns, sizeBtns[1]);
+    var clearBtn = mkBtn("🗑 Hapus", "gambar-btn");
+    clearBtn.addEventListener("click", function () {
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      save("wd-gambar", canvas.toDataURL("image/png"));
+      status.textContent = "Kanvas dibersihkan dan tersimpan ✓";
+    });
+    var dlBtn = mkBtn("⬇ Unduh PNG", "btn-primary");
+    dlBtn.addEventListener("click", function () {
+      var a = document.createElement("a");
+      a.href = canvas.toDataURL("image/png");
+      a.download = "gambar.png";
+      a.click();
+    });
+
+    var saved = store("wd-gambar", null);
+    if (saved) {
+      var img = new Image();
+      img.onload = function () { ctx.drawImage(img, 0, 0); };
+      img.src = saved;
+    } else {
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    var drawing = false, lastX = 0, lastY = 0;
+    function pos(e) {
+      var r = canvas.getBoundingClientRect();
+      return {
+        x: (e.clientX - r.left) * (canvas.width / r.width),
+        y: (e.clientY - r.top) * (canvas.height / r.height)
+      };
+    }
+    canvas.addEventListener("pointerdown", function (e) {
+      drawing = true;
+      var p = pos(e);
+      lastX = p.x; lastY = p.y;
+      try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* abaikan */ }
+    });
+    canvas.addEventListener("pointermove", function (e) {
+      if (!drawing) return;
+      var p = pos(e);
+      ctx.strokeStyle = erasing ? "#ffffff" : color;
+      ctx.lineWidth = size;
+      ctx.beginPath();
+      ctx.moveTo(lastX, lastY);
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+      lastX = p.x; lastY = p.y;
+    });
+    function endStroke() {
+      if (!drawing) return;
+      drawing = false;
+      save("wd-gambar", canvas.toDataURL("image/png"));
+      status.textContent = "Tersimpan ✓ (otomatis di perangkat ini)";
+    }
+    canvas.addEventListener("pointerup", endStroke);
+    canvas.addEventListener("pointercancel", endStroke);
+
+    wrap.appendChild(tools);
+    wrap.appendChild(canvas);
+    wrap.appendChild(status);
+    body.appendChild(wrap);
+  }
+
   window.APPS = {
     chat: { emoji: "💬", title: "Obrolan", render: renderChat },
     browser: { emoji: "🌐", title: "Peramban", render: renderBrowser },
@@ -676,7 +800,8 @@
     files: { emoji: "📁", title: "Files", render: renderFiles },
     settings: { emoji: "⚙️", title: "Pengaturan", render: renderSettings },
     music: { emoji: "🎵", title: "Musik", render: renderMusic },
-    terminal: { emoji: "💻", title: "Terminal", render: renderTerminal }
+    terminal: { emoji: "💻", title: "Terminal", render: renderTerminal },
+    gambar: { emoji: "🎨", title: "Gambar", render: renderGambar }
   };
 })();
 
