@@ -1,6 +1,6 @@
 // Tes MANUAL ambang sustained 100/jam (S4) — TIDAK masuk rantai `npm test`
 // karena memakan waktu ~10 menit (10 batch x 10 pesan, jeda 61 detik antar
-// batch agar ambang burst 10/menit tidak terpicu).
+// batch DAN sebelum pesan ke-101 agar ambang burst 10/menit tidak terpicu).
 // Jalankan: node scripts/test-s4-sustained-manual.js
 // Harapan: 100 pesan pertama -> 200; pesan ke-101 dalam jam yang sama ->
 // 429 batas_pesan_per_jam. Nilai dummy saja.
@@ -28,6 +28,13 @@ async function main() {
         await H.sleep(61000);
       }
     }
+    // KOREKSI pacing (temuan run pertama): pesan ke-101 harus dikirim SETELAH
+    // jeda 61 detik dari batch 10, kalau tidak jendela burst 10/menit masih
+    // berisi 10 pesan batch 10 dan yang terpicu adalah pesan_terlalu_cepat,
+    // bukan batas_pesan_per_jam. Jeda ini membersihkan jendela menit
+    // sementara 100 pesan tetap di dalam jendela jam.
+    console.log("sustained: jeda 61 detik sebelum pesan ke-101 (membersihkan jendela burst)");
+    await H.sleep(61000);
     const over = await H.req(8551, "POST", "/api/rooms/umum/messages", { headers: { Cookie: H.cookieHeader(tok), "Content-Type": "application/json" }, body: H.jsonBody({ text: "pesan 101" }) });
     C.ok(over.status, 429, "sustained: pesan ke-101 dalam jam yang sama -> 429");
     C.okBody(over.body, "batas_pesan_per_jam", "sustained: body batas_pesan_per_jam");
