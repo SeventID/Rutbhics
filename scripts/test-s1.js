@@ -62,9 +62,13 @@ async function main() {
     C.ok((await H.chatPost(R, tok)).status, 503, "A: login+sesi POST chat tanpa Origin diizinkan (klien non-browser)");
     C.ok((await H.req(R, "GET", "/api/models", { headers: { Cookie: H.cookieHeader(tok) } })).status, 200, "A: login+sesi GET models tanpa Origin diizinkan");
     C.ok((await H.req(R, "GET", "/api/chat", { headers: { Cookie: H.cookieHeader(tok) } })).status, 200, "A: login+sesi GET chat tanpa Origin diizinkan");
+    // A2-01: ekspektasi lama ("Origin loopback diizinkan") menguji
+    // allowance yang rentan — sesi sah + Origin loopback port/host lain
+    // kini 403 (exact-Origin). Baris ini BUKAN bagian matriks S1 yang
+    // disetujui (matriks hanya memuat Origin host == Host -> sukses).
     const loopOk = { headers: { Origin: "http://localhost:8080", Cookie: H.cookieHeader(tok), "Content-Type": "application/json" }, body: chatNoProv.body };
-    C.ok((await H.req(R, "POST", "/api/chat", loopOk)).status, 503, "A: login+sesi POST chat Origin loopback diizinkan");
-    C.ok((await H.req(R, "GET", "/api/models", { headers: { Origin: "http://localhost:8080", Cookie: H.cookieHeader(tok) } })).status, 200, "A: login+sesi GET models Origin loopback diizinkan");
+    C.ok((await H.req(R, "POST", "/api/chat", loopOk)).status, 403, "A: login+sesi POST chat Origin loopback port/host lain -> 403 (A2-01)");
+    C.ok((await H.req(R, "GET", "/api/models", { headers: { Origin: "http://localhost:8080", Cookie: H.cookieHeader(tok) } })).status, 403, "A: login+sesi GET models Origin loopback port/host lain -> 403 (A2-01)");
 
     // ===== B. VALIDASI SESI (langsung, tree yang sama) =====
     const D = 8471;

@@ -312,12 +312,20 @@ Perilaku:
 > - **Mode `login` (wajib di balik proxy/domain publik):** alamat socket
 >   TIDAK berperan. Tanpa sesi login → 401 untuk SEMUA varian Origin
 >   (tanpa Origin, Origin loopback palsu, Origin domain publik, Origin
->   jahat). Ada sesi + (tanpa Origin ATAU Origin host loopback ATAU
->   Origin host == Host header) → diizinkan. Ada sesi + Origin asing →
->   403. Konsekuensi yang disengaja: browser LAN/jarak jauh dan skrip
+>   jahat). Ada sesi + (tanpa Origin ATAU Origin PERSIS == Host header,
+>   skema+host+port) → diizinkan. Ada sesi + Origin lain (termasuk Origin
+>   loopback port lain) → 403. Konsekuensi yang disengaja: browser LAN/jarak jauh dan skrip
 >   WAJIB login (akun server) untuk memakai Bot AI; `GET /api/chat`
 >   (status) ikut digate dengan aturan yang sama. Tidak ada flag mode
 >   lain: `AI_ACCESS` sudah cukup.
+>
+> **CSRF exact-Origin (A2-01):** POST tulis (`/api/rooms`, `/api/auth`)
+>   dan endpoint AI mode login mensyaratkan Origin PERSIS == Host header
+>   (skema+host+port), atau tanpa Origin untuk klien non-browser.
+>   Deployment standar (desktop dilayani server yang sama, fetch URL
+>   relatif) tidak berubah; LAN via IP tidak berubah (Origin host ==
+>   Host IP). Split-hosting (desktop statis dari port lain) mendapat 403
+>   pada tulis — layani desktop dari server yang sama.
 >
 > **PERINGATAN TEGAS:** `AI_ACCESS=local` yang disetel eksplisit TETAP
 > BERBAHAYA bila server diekspos lewat reverse proxy/domain publik —

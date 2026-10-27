@@ -484,9 +484,12 @@ function isLoopbackOrigin(req) {
 // Gate mode login (S1): alamat socket TIDAK berperan sama sekali —
 // Origin dapat dipalsukan klien lewat proxy, jadi tidak boleh menjadi
 // pengecualian tanpa login. Tanpa sesi -> 401 untuk SEMUA varian Origin;
-// ada sesi + (tanpa Origin ATAU Origin host loopback ATAU Origin host ==
-// Host header) -> izinkan; ada sesi + Origin asing -> 403 (defense-in-depth
-// CSRF; SameSite=Lax sudah menahan cookie pada POST lintas situs).
+// ada sesi + (tanpa Origin ATAU Origin PERSIS == Host header,
+// skema+host+port) -> izinkan; ada sesi + Origin lain (termasuk Origin
+// loopback port lain, mis. localhost:9999 ke server localhost:8080) ->
+// 403 (defense-in-depth CSRF; SameSite=Lax menahan cookie lintas SITE,
+// bukan lintas ORIGIN — dua port localhost adalah satu site, jadi cookie
+// tetap terkirim dari halaman loopback port lain, A2-01).
 // Mengembalikan null bila diizinkan, atau {status, error, message}.
 function aiAccessLogin(req) {
   const me = sessionUser(req);
@@ -495,20 +498,19 @@ function aiAccessLogin(req) {
   if (!origin) return null;
   try {
     const u = new URL(origin);
-    if (u.protocol === "http:" || u.protocol === "https:") {
-      const h = u.hostname.toLowerCase().replace(/^\[|\]$/g, "");
-      if (h === "localhost" || h === "127.0.0.1" || h === "::1") return null;
-      if (h !== "" && h === hostNameOf(req.headers.host)) return null;
-    }
+    if ((u.protocol === "http:" || u.protocol === "https:") && u.host !== "" && u.host === (req.headers.host || "").trim().toLowerCase()) return null;
   } catch (e) { /* jatuh ke 403 */ }
   return { status: 403, error: "origin_tidak_diizinkan", message: "Origin tidak diizinkan untuk endpoint AI." };
 }
 
-// Cek Origin same-origin untuk POST tulis (P2b): lolos bila tanpa Origin,
-// Origin loopback, atau Origin host == Host header (akses LAN via IP tetap
-// jalan karena klien selalu same-origin; situs asing selalu ditolak).
-// Catatan: loopback-only saja akan merusak login/tulis rooms saat server
-// diakses via IP LAN (--host), jadi pencocokan Host disengaja.
+// Cek Origin exact-origin untuk POST tulis (P2b, A2-01): lolos bila tanpa
+// Origin (klien non-browser), atau Origin PERSIS == Host header
+// (skema+host+port). Situs asing selalu ditolak, dan halaman loopback
+// port lain juga ditolak: SameSite=Lax menahan cookie lintas SITE, bukan
+// lintas ORIGIN, jadi halaman localhost port lain masih membawa cookie
+// sesi. Akses LAN via IP tetap jalan karena klien selalu same-origin;
+// split-hosting (desktop statis dari port lain) mendapat 403 pada tulis —
+// layani desktop dari server yang sama.
 function hostNameOf(hostHeader) {
   const h = (hostHeader || "").trim().toLowerCase();
   if (h.startsWith("[")) {
@@ -520,13 +522,10 @@ function hostNameOf(hostHeader) {
 function isSameOriginWrite(req) {
   const origin = req.headers.origin;
   if (!origin) return true;
-  if (isLoopbackOrigin(req)) return true;
   try {
     const u = new URL(origin);
     if (u.protocol !== "http:" && u.protocol !== "https:") return false;
-    const h = u.hostname.toLowerCase().replace(/^\[|\]$/g, "");
-    const host = hostNameOf(req.headers.host);
-    return h !== "" && h === host;
+    return u.host !== "" && u.host === (req.headers.host || "").trim().toLowerCase();
   } catch (e) { return false; }
 }
 
