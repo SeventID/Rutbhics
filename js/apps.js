@@ -612,7 +612,7 @@
       c.addEventListener("click", function () { openUrl(u); });
       links.appendChild(c);
     });
-    var frame = el('<iframe class="browser-frame" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>');
+    var frame = el('<iframe class="browser-frame" sandbox="allow-scripts allow-forms"></iframe>');
     var hint = el('<p class="hint"></p>');
     hint.textContent = tr("browserHint");
     body.appendChild(bar); body.appendChild(links); body.appendChild(frame); body.appendChild(hint);
