@@ -35,7 +35,27 @@
     chatReplyLang: { id: "Bahasa balasan:", en: "Reply language:" },
     chatLangAuto: { id: "Ikuti bahasa UI", en: "Follow UI language" },
     chatMultiRoom: { id: "Ruang:", en: "Room:" },
-    chatMultiName: { id: "Nama:", en: "Name:" },
+    authLogin: { id: "Masuk", en: "Log in" },
+    authRegister: { id: "Daftar", en: "Register" },
+    authIdentifier: { id: "Username, email, atau HP", en: "Username, email, or phone" },
+    authUsername: { id: "Username (3-30 karakter)", en: "Username (3-30 characters)" },
+    authEmail: { id: "Email (opsional)", en: "Email (optional)" },
+    authPhone: { id: "HP (opsional)", en: "Phone (optional)" },
+    authPassword: { id: "Kata sandi (min. 8 karakter)", en: "Password (min. 8 characters)" },
+    authLogout: { id: "Keluar", en: "Log out" },
+    authAs: { id: "Masuk sebagai {name}", en: "Logged in as {name}" },
+    authLoginGoogle: { id: "Login dengan Google", en: "Log in with Google" },
+    authLoginGithub: { id: "Login dengan GitHub", en: "Log in with GitHub" },
+    authErrInvalid: { id: "Data tidak valid. Periksa username, email, atau HP.", en: "Invalid data. Check the username, email, or phone." },
+    authErrShort: { id: "Kata sandi minimal 8 karakter.", en: "Password must be at least 8 characters." },
+    authErrUserTaken: { id: "Username sudah dipakai.", en: "Username is already taken." },
+    authErrEmailTaken: { id: "Email sudah dipakai akun lain.", en: "Email is already used by another account." },
+    authErrPhoneTaken: { id: "Nomor HP sudah dipakai akun lain.", en: "Phone number is already used by another account." },
+    authErrWrong: { id: "Akun tidak ditemukan atau kata sandi salah.", en: "Account not found or wrong password." },
+    authErrTooMany: { id: "Terlalu banyak percobaan. Coba lagi 10 menit lagi.", en: "Too many attempts. Try again in 10 minutes." },
+    authErrOauth: { id: "Login ini belum dikonfigurasi di server.", en: "This login is not configured on the server." },
+    authErrNeedLogin: { id: "Masuk dulu untuk mengirim pesan atau membuat ruang.", en: "Log in first to send messages or create rooms." },
+    authErrGeneric: { id: "Terjadi kesalahan. Coba lagi.", en: "Something went wrong. Try again." },
     chatMultiPlaceholder: { id: "Tulis pesan ke ruang ini...", en: "Write a message to this room..." },
     chatMultiSend: { id: "Kirim", en: "Send" },
     chatMultiCreate: { id: "Buat ruang", en: "Create room" },
@@ -247,9 +267,10 @@
     // ---------- Chat multi-user (ruang + pesan di server) ----------
     // Pesan tinggal di server rutbhics (bukan localStorage perangkat),
     // jadi semua perangkat yang membuka server yang sama melihat pesan
-    // yang sama. Tahap 1 tanpa akun server: nama adalah klaim perangkat
-    // (dari login desktop atau kolom nama). Pesan baru ditarik tiap 3
-    // detik; polling berhenti sendiri saat jendela Obrolan ditutup.
+    // yang sama — tapi nama pengirim kini username terverifikasi dari akun
+    // server (masuk/daftar di pane ini, atau login Google/GitHub bila
+    // server mengonfigurasinya). Pesan baru ditarik tiap 3 detik;
+    // polling berhenti sendiri saat jendela Obrolan ditutup.
     var multiEl = el('<div class="chat-multi"></div>');
     var roomRow = el('<div class="chat-model-row"></div>');
     var roomLabel = el('<span class="hint" style="margin:0"></span>');
@@ -259,19 +280,130 @@
     var refreshBtn = el('<button class="chip"></button>');
     refreshBtn.textContent = tr("chatMultiRefresh");
     roomRow.appendChild(roomLabel); roomRow.appendChild(roomSelect); roomRow.appendChild(refreshBtn);
-    var nameRow = el('<div class="chat-model-row"></div>');
-    var nameLabel = el('<span class="hint" style="margin:0"></span>');
-    nameLabel.textContent = tr("chatMultiName");
-    var nameInput = el('<input type="text" class="chat-name-input">');
-    var multiName = "";
-    try { multiName = sessionStorage.getItem("wd-session") || localStorage.getItem("wd-chat-name") || ""; } catch (e) {}
-    if (!multiName) multiName = tr("chatMultiGuest");
-    nameInput.value = multiName;
-    nameInput.addEventListener("input", function () {
-      multiName = nameInput.value.trim() || tr("chatMultiGuest");
-      try { localStorage.setItem("wd-chat-name", multiName); } catch (e) {}
+    // ---------- Akun server untuk chat multi-user ----------
+    // Masuk/daftar di sini (bukan login desktop lokal). Sesi memakai
+    // cookie httpOnly dari server; klien hanya menanyakan /api/auth/me.
+    // Nama pengirim pesan selalu username terverifikasi dari sesi.
+    var authBox = el('<div class="chat-auth"></div>');
+    var authStatus = el('<p class="hint"></p>');
+    var authLogout = el('<button class="chip"></button>');
+    authLogout.textContent = tr("authLogout");
+    var authStatusRow = el('<div class="chat-model-row"></div>');
+    authStatusRow.appendChild(authStatus); authStatusRow.appendChild(authLogout);
+    var authForm = el('<div></div>');
+    var authModeRow = el('<div class="chat-model-row"></div>');
+    var authLoginTab = el('<button class="chip active"></button>');
+    authLoginTab.textContent = tr("authLogin");
+    var authRegisterTab = el('<button class="chip"></button>');
+    authRegisterTab.textContent = tr("authRegister");
+    authModeRow.appendChild(authLoginTab); authModeRow.appendChild(authRegisterTab);
+    var authLoginFields = el('<div></div>');
+    var authIdentifier = el('<input type="text" class="chat-name-input" style="width:100%;box-sizing:border-box;margin-bottom:6px" placeholder="' + tr("authIdentifier") + '">');
+    var authLoginPass = el('<input type="password" class="chat-name-input" style="width:100%;box-sizing:border-box;margin-bottom:6px" placeholder="' + tr("authPassword") + '">');
+    authLoginFields.appendChild(authIdentifier); authLoginFields.appendChild(authLoginPass);
+    var authRegisterFields = el('<div></div>');
+    var authUsername = el('<input type="text" class="chat-name-input" style="width:100%;box-sizing:border-box;margin-bottom:6px" placeholder="' + tr("authUsername") + '">');
+    var authEmail = el('<input type="text" class="chat-name-input" style="width:100%;box-sizing:border-box;margin-bottom:6px" placeholder="' + tr("authEmail") + '">');
+    var authPhone = el('<input type="text" class="chat-name-input" style="width:100%;box-sizing:border-box;margin-bottom:6px" placeholder="' + tr("authPhone") + '">');
+    var authRegisterPass = el('<input type="password" class="chat-name-input" style="width:100%;box-sizing:border-box;margin-bottom:6px" placeholder="' + tr("authPassword") + '">');
+    authRegisterFields.appendChild(authUsername); authRegisterFields.appendChild(authEmail);
+    authRegisterFields.appendChild(authPhone); authRegisterFields.appendChild(authRegisterPass);
+    var authSubmit = el('<button class="btn-primary">' + tr("authLogin") + '</button>');
+    var authMsg = el('<p class="hint"></p>');
+    var oauthRow = el('<div class="chat-model-row"></div>');
+    var oauthGoogle = el('<a class="chip" href="/api/auth/google"></a>');
+    oauthGoogle.textContent = tr("authLoginGoogle");
+    var oauthGithub = el('<a class="chip" href="/api/auth/github"></a>');
+    oauthGithub.textContent = tr("authLoginGithub");
+    oauthRow.appendChild(oauthGoogle); oauthRow.appendChild(oauthGithub);
+    authForm.appendChild(authModeRow); authForm.appendChild(authLoginFields);
+    authForm.appendChild(authRegisterFields); authForm.appendChild(authSubmit); authForm.appendChild(authMsg);
+    authForm.appendChild(oauthRow);
+    authBox.appendChild(authStatusRow); authBox.appendChild(authForm);
+
+    var authUser = null;
+    var authProviders = { password: true, google: false, github: false };
+    var authMode = "login";
+    function setAuthMode(mode) {
+      authMode = mode;
+      authLoginTab.className = "chip" + (mode === "login" ? " active" : "");
+      authRegisterTab.className = "chip" + (mode === "register" ? " active" : "");
+      authLoginFields.style.display = mode === "login" ? "" : "none";
+      authRegisterFields.style.display = mode === "register" ? "" : "none";
+      authSubmit.textContent = mode === "login" ? tr("authLogin") : tr("authRegister");
+    }
+    authLoginTab.addEventListener("click", function () { setAuthMode("login"); });
+    authRegisterTab.addEventListener("click", function () { setAuthMode("register"); });
+    function renderAuth() {
+      var loggedIn = !!authUser;
+      authStatusRow.style.display = loggedIn ? "" : "none";
+      authForm.style.display = loggedIn ? "none" : "";
+      if (loggedIn) {
+        authStatus.textContent = tr("authAs").replace("{name}", authUser);
+        authMsg.textContent = "";
+      }
+      oauthGoogle.style.display = authProviders.google ? "" : "none";
+      oauthGithub.style.display = authProviders.github ? "" : "none";
+      oauthRow.style.display = (authProviders.google || authProviders.github) ? "" : "none";
+    }
+    var AUTH_ERR = {
+      username_tidak_valid: "authErrInvalid",
+      email_tidak_valid: "authErrInvalid",
+      hp_tidak_valid: "authErrInvalid",
+      password_terlalu_pendek: "authErrShort",
+      username_sudah_dipakai: "authErrUserTaken",
+      email_sudah_dipakai: "authErrEmailTaken",
+      hp_sudah_dipakai: "authErrPhoneTaken",
+      kredensial_salah: "authErrWrong",
+      terlalu_banyak_percobaan: "authErrTooMany",
+      oauth_tidak_dikonfigurasi: "authErrOauth",
+      login_diperlukan: "authErrNeedLogin"
+    };
+    function fetchAuth() {
+      if (typeof fetch !== "function") return;
+      fetch("/api/auth/providers").then(function (r) { return r.json(); }).then(function (p) {
+        if (p) authProviders = p;
+        return fetch("/api/auth/me").then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); });
+      }).then(function (res) {
+        authUser = (res.ok && res.body && res.body.user) ? res.body.user.username : null;
+        renderAuth();
+      }).catch(function () { renderAuth(); });
+    }
+    function authSubmitHandler() {
+      var path = authMode === "login" ? "/api/auth/login" : "/api/auth/register";
+      var body = {};
+      if (authMode === "login") {
+        body = { identifier: authIdentifier.value.trim(), password: authLoginPass.value };
+      } else {
+        body = { username: authUsername.value.trim(), email: authEmail.value.trim(), phone: authPhone.value.trim(), password: authRegisterPass.value };
+      }
+      authMsg.textContent = "";
+      fetch(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); }).then(function (res) {
+        if (res.ok && res.body && res.body.user) {
+          authUser = res.body.user.username;
+          renderAuth();
+          fetchRooms(); fetchMulti();
+        } else {
+          var key = AUTH_ERR[(res.body && res.body.error) || ""] || "authErrGeneric";
+          authMsg.textContent = tr(key);
+        }
+      }).catch(function () { authMsg.textContent = tr("chatMultiOffline"); });
+    }
+    authSubmit.addEventListener("click", authSubmitHandler);
+    authLoginPass.addEventListener("keydown", function (e) { if (e.key === "Enter") authSubmitHandler(); });
+    authRegisterPass.addEventListener("keydown", function (e) { if (e.key === "Enter") authSubmitHandler(); });
+    authLogout.addEventListener("click", function () {
+      fetch("/api/auth/logout", { method: "POST" }).then(function () {
+        authUser = null;
+        renderAuth();
+      }).catch(function () { authUser = null; renderAuth(); });
     });
-    nameRow.appendChild(nameLabel); nameRow.appendChild(nameInput);
+    setAuthMode("login");
+    renderAuth();
     var multiMsgs = el('<div class="chat-msgs"></div>');
     var multiInputRow = el('<div class="chat-input"></div>');
     var multiInput = el('<input type="text" placeholder="' + tr("chatMultiPlaceholder") + '">');
@@ -283,7 +415,7 @@
     createRow.appendChild(newRoomInput); createRow.appendChild(createBtn);
     var multiHint = el('<p class="hint"></p>');
     multiHint.textContent = tr("chatMultiHint");
-    multiEl.appendChild(roomRow); multiEl.appendChild(nameRow); multiEl.appendChild(multiMsgs);
+    multiEl.appendChild(authBox); multiEl.appendChild(roomRow); multiEl.appendChild(multiMsgs);
     multiEl.appendChild(multiInputRow); multiEl.appendChild(createRow); multiEl.appendChild(multiHint);
 
     var currentRoom = null;
@@ -291,7 +423,7 @@
     var lastSeq = 0;
     var multiTimer = null;
     function drawMultiMsg(m) {
-      var d = el('<div class="msg ' + (m.user === multiName ? "me" : "them") + '"></div>');
+      var d = el('<div class="msg ' + (m.user === authUser ? "me" : "them") + '"></div>');
       var n = el('<div class="msg-name"></div>');
       n.textContent = m.user;
       var t = el('<div class="msg-text"></div>');
@@ -358,7 +490,7 @@
       inputRow.style.display = multi ? "none" : "";
       hintEl.style.display = multi ? "none" : "";
       multiEl.style.display = multi ? "" : "none";
-      if (multi) { ensureMultiPoll(); fetchRooms(); fetchMulti(); }
+      if (multi) { ensureMultiPoll(); fetchAuth(); fetchRooms(); fetchMulti(); }
     }
     roomSelect.addEventListener("change", function () {
       currentRoom = roomSelect.value || null;
@@ -369,14 +501,16 @@
     function sendMulti() {
       var text = multiInput.value.trim();
       if (!text || !currentRoom) return;
-      var name = nameInput.value.trim() || tr("chatMultiGuest");
-      multiName = name;
-      try { localStorage.setItem("wd-chat-name", multiName); } catch (e) {}
       fetch("/api/rooms/" + encodeURIComponent(currentRoom) + "/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user: multiName, text: text })
-      }).then(function (r) { return r.json(); }).then(function () {
+        body: JSON.stringify({ text: text })
+      }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); }).then(function (res) {
+        if (!res.ok && res.body && res.body.error === "login_diperlukan") {
+          multiHint.textContent = tr("authErrNeedLogin");
+          fetchAuth();
+          return;
+        }
         multiInput.value = "";
         fetchMulti();
       }).catch(function () { multiHint.textContent = tr("chatMultiOffline"); });
@@ -391,6 +525,11 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: name })
       }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); }).then(function (res) {
+        if (!res.ok && res.body && res.body.error === "login_diperlukan") {
+          multiHint.textContent = tr("authErrNeedLogin");
+          fetchAuth();
+          return;
+        }
         if (!res.ok || !res.body || !res.body.room) { multiHint.textContent = tr("chatMultiCreateFail"); return; }
         newRoomInput.value = "";
         currentRoom = res.body.room.id;

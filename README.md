@@ -169,3 +169,40 @@ Catatan jujur (tahap 1):
 - Endpoint AI (`/api/chat`, `/api/models`) tetap hanya menerima koneksi
   lokal, supaya kunci Larprouter tidak bisa dipakai perangkat lain.
 
+## Akun pengguna (login/register)
+
+Membaca ruang dan pesan tetap terbuka, tapi membuat ruang dan mengirim
+pesan wajib login — nama pengirim selalu username terverifikasi dari
+akun server, bukan lagi klaim bebas. Login desktop (halaman login)
+tetap akun lokal per perangkat dan tidak berubah; akun server ini
+khusus untuk chat multi-user, diatur di dalam pane "👥 Multi-User".
+
+Metode yang tersedia:
+
+1. **Username, email, atau HP + kata sandi.** Daftar dengan username
+   (3–30 karakter), email dan HP opsional, kata sandi minimal 8
+   karakter. Masuk bisa memakai username, email, atau nomor HP mana
+   pun yang didaftarkan. Kata sandi disimpan sebagai hash scrypt +
+   salt di berkas `rutbhics-users.json` di folder kerja (bukan hash
+   browser seperti login lokal). Sesi memakai cookie httpOnly 30 hari.
+   Login dibatasi 10 percobaan gagal per IP per 10 menit.
+2. **Google / GitHub (OAuth).** Tombolnya muncul di pane multi-user
+   hanya bila server dikonfigurasi. Caranya: buat OAuth app
+   (Google Cloud Console → Credentials → OAuth client ID, atau GitHub
+   Settings → Developer settings → OAuth Apps), lalu jalankan server
+   dengan environment:
+   - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, dan/atau
+     `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`
+   - Redirect URI yang didaftarkan di provider harus persis
+     `<alamat-server>/api/auth/google/callback` (atau
+     `/api/auth/github/callback`), misalnya
+     `http://192.168.1.5:8080/api/auth/google/callback` — alamat yang
+     dipakai membuka Rutbhics harus sama dengan yang didaftarkan.
+     Bila perlu, paksa basisnya lewat `OAUTH_REDIRECT_BASE`
+     (mis. `OAUTH_REDIRECT_BASE=http://192.168.1.5:8080 rutbhics`).
+   Akun OAuth dikenali dari ID provider (bukan email), jadi email yang
+   sudah dipakai akun lain tidak akan membajak akun tersebut.
+
+Catatan jujur (tahap ini): belum ada verifikasi email, lupa kata
+sandi, atau ganti kata sandi — itu tahap berikutnya bila dibutuhkan.
+
