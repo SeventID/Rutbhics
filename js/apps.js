@@ -52,6 +52,7 @@
     authErrPhoneTaken: { id: "Nomor HP sudah dipakai akun lain.", en: "Phone number is already used by another account." },
     authErrWrong: { id: "Akun tidak ditemukan atau kata sandi salah.", en: "Account not found or wrong password." },
     authErrTooMany: { id: "Terlalu banyak percobaan. Coba lagi 10 menit lagi.", en: "Too many attempts. Try again in 10 minutes." },
+    authErrRegLimit: { id: "Terlalu banyak pendaftaran. Coba lagi 1 jam lagi.", en: "Too many registrations. Try again in 1 hour." },
     authErrOauth: { id: "Login ini belum dikonfigurasi di server.", en: "This login is not configured on the server." },
     authErrNeedLogin: { id: "Masuk dulu untuk mengirim pesan atau membuat ruang.", en: "Log in first to send messages or create rooms." },
     authErrGeneric: { id: "Terjadi kesalahan. Coba lagi.", en: "Something went wrong. Try again." },
@@ -317,6 +318,8 @@
       hp_sudah_dipakai: "authErrPhoneTaken",
       kredensial_salah: "authErrWrong",
       terlalu_banyak_percobaan: "authErrTooMany",
+      pendaftaran_gagal: "authErrGeneric",
+      pendaftaran_dibatasi: "authErrRegLimit",
       oauth_tidak_dikonfigurasi: "authErrOauth",
       login_diperlukan: "authErrNeedLogin"
     };

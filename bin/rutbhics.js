@@ -765,6 +765,22 @@ function noteLoginFail(ip) {
   if (!rec || now - rec.first > 10 * 60 * 1000) loginFails[ip] = { count: 1, first: now };
   else rec.count += 1;
 }
+// Throttle registrasi: maks 5 percobaan per IP per jam (P1-4). Dihitung
+// untuk percobaan berformat valid (termasuk yang gagal karena duplikat)
+// agar enumerasi akun ikut terhambat; format tidak valid tidak dihitung.
+const registerAttempts = {};
+function registerBlocked(ip) {
+  const rec = registerAttempts[ip];
+  if (!rec) return false;
+  if (Date.now() - rec.first > 60 * 60 * 1000) { delete registerAttempts[ip]; return false; }
+  return rec.count >= 5;
+}
+function noteRegisterAttempt(ip) {
+  const now = Date.now();
+  const rec = registerAttempts[ip];
+  if (!rec || now - rec.first > 60 * 60 * 1000) registerAttempts[ip] = { count: 1, first: now };
+  else rec.count += 1;
+}
 function oauthConfig(provider) {
   if (provider === "google") {
     return process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
@@ -863,9 +879,16 @@ function handleAuth(req, res) {
       if (email && !validEmail(email)) { sendJson(res, 400, { error: "email_tidak_valid" }); return; }
       if (phone && !validPhone(phone)) { sendJson(res, 400, { error: "hp_tidak_valid" }); return; }
       if (!password || password.length < 8) { sendJson(res, 400, { error: "password_terlalu_pendek" }); return; }
-      if (usersData.users.some((u) => u.username.toLowerCase() === username.toLowerCase())) { sendJson(res, 400, { error: "username_sudah_dipakai" }); return; }
-      if (email && usersData.users.some((u) => (u.email || "").toLowerCase() === email.toLowerCase())) { sendJson(res, 400, { error: "email_sudah_dipakai" }); return; }
-      if (phone && usersData.users.some((u) => u.phone === phone)) { sendJson(res, 400, { error: "hp_sudah_dipakai" }); return; }
+      const regIp = (req.socket && req.socket.remoteAddress) || "unknown";
+      if (registerBlocked(regIp)) { sendJson(res, 429, { error: "pendaftaran_dibatasi" }); return; }
+      noteRegisterAttempt(regIp);
+      // Pesan generik (P1-4): jangan bocorkan field mana yang sudah dipakai.
+      if (usersData.users.some((u) => u.username.toLowerCase() === username.toLowerCase())
+        || (email && usersData.users.some((u) => (u.email || "").toLowerCase() === email.toLowerCase()))
+        || (phone && usersData.users.some((u) => u.phone === phone))) {
+        sendJson(res, 400, { error: "pendaftaran_gagal" });
+        return;
+      }
       const user = { id: crypto.randomBytes(16).toString("hex"), username, email, phone, passHash: hashPassword(password), provider: "local", providerId: "", createdAt: Date.now() };
       usersData.users.push(user);
       const token = createSession(user.id);
