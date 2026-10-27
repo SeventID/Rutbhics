@@ -421,6 +421,29 @@ memperbaikinya dengan aturan berikut:
   tidak dapat diterima, jalankan proxy di alamat khusus dan persempit
   `TRUSTED_PROXIES` ke alamat itu saja.
 
+**Kuota AI + batas penyalahgunaan (S4).**
+
+- Kuota AI per pengguna per hari: env `AI_QUOTA_PER_DAY` (default 50
+  panggilan/hari/akun; `0` = tanpa batas; nilai tak valid/negatif =
+  default 50). Hari = tanggal lokal server (YYYY-MM-DD), reset otomatis
+  berganti hari. Yang dihitung adalah attempt: panggilan chat yang lolos
+  gate S1 + allowlist S2 dan diteruskan ke provider — gagal provider
+  tetap dihitung. Habis → 429 `kuota_habis` dengan pesan jelas.
+  Hitungan disimpan di `rutbhics-users.json` (ikut simpan atomik) pada
+  tiap increment, sehingga kuota hari berjalan bertahan saat restart.
+  Hanya pengguna login yang dikenai kuota; pemakaian AI anonim mode
+  local dibebaskan karena hanya mungkin dari perangkat pemilik sendiri
+  (gate socket memblokir non-loopback) — kuota adalah kontrol multi-user.
+- Rate limit pesan per pengguna: burst 10/menit + 100/jam, dihitung dari
+  pesan yang tersimpan saja (baca tidak dibatasi). Melebihi → 429
+  (`pesan_terlalu_cepat` / `batas_pesan_per_jam`). Hanya di memori;
+  restart mengatur ulang window.
+- Batas ruang per pengguna: 5 ruang/pengguna, di samping cap global 20
+  yang tidak berubah. Dihitung dari `createdBy` (username pembuat);
+  ruang lama tanpa `createdBy` (mis. ruang `umum`) tidak dihitung ke
+  siapa pun. Ruang ke-6 → 429 `batas_ruang_per_pengguna` dengan pesan
+  jelas. Semua ruang baru (publik maupun privat) menyimpan `createdBy`.
+
 HTTPS: `certbot --nginx -d namadomain.example` (atau DNS-01 bila perlu).
 Untuk deployment publik, setel `OAUTH_REDIRECT_BASE=https://namadomain.example`
 di `.env` agar callback OAuth tidak bergantung pada header Host.

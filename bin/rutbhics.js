@@ -651,6 +651,16 @@ function handleChat(req, res) {
       });
       return;
     }
+    // Kuota AI (S4): hanya pengguna login; pemakaian anonim mode local
+    // dibebaskan (hanya mungkin dari perangkat pemilik sendiri).
+    // Dihitung attempt: lolos gate S1 + allowlist S2, diteruskan ke
+    // provider — ditempatkan di sini, setelah semua validasi model dan
+    // sebelum callProvider, tanpa await di antaranya.
+    const quotaUser = sessionUser(req);
+    if (quotaUser) {
+      const quotaErr = aiQuotaCheck(quotaUser);
+      if (quotaErr) { sendJson(res, quotaErr.status, { error: quotaErr.error, message: quotaErr.message }); return; }
+    }
     const replyModel = reqModelRaw || (resolved.provider.id + ":" + resolved.model);
     try {
       const reply = await callProvider(resolved.provider, resolved.model, systemPrompt, clean);
@@ -848,6 +858,11 @@ function handleRooms(req, res) {
         visibility = input.visibility;
       }
       if (chatData.rooms.length >= 20) { sendJson(res, 400, { error: "ruang_penuh" }); return; }
+      // Batas ruang per pengguna (S4): 5 ruang/pengguna, di samping cap
+      // global 20 yang tidak berubah. Dihitung dari createdBy (username
+      // pembuat); ruang lama tanpa createdBy tidak dihitung ke siapa pun.
+      const ownedRooms = chatData.rooms.filter((r) => r.createdBy === me.username).length;
+      if (ownedRooms >= 5) { sendJson(res, 429, { error: "batas_ruang_per_pengguna", message: "Batas ruang per pengguna tercapai (maks 5 ruang)." }); return; }
       const room = { id: slugRoom(name), name: name.slice(0, 50), visibility, createdBy: me.username };
       if (visibility === "private") room.members = [me.username];
       chatData.rooms.push(room);
@@ -886,9 +901,14 @@ function handleRooms(req, res) {
           sendJson(res, 400, { error: "pesan_tidak_valid" });
           return;
         }
+        // Rate limit pesan per pengguna (S4): burst 10/menit + 100/jam,
+        // dihitung dari pesan yang tersimpan saja; baca tidak dibatasi.
+        const rateErr = msgRateCheck(me.id);
+        if (rateErr) { sendJson(res, rateErr.status, { error: rateErr.error, message: rateErr.message }); return; }
         chatData.seq += 1;
         const msg = { seq: chatData.seq, user: me.username, text: text.slice(0, 2000), time: Date.now() };
         chatData.messages[roomId].push(msg);
+        msgRateNote(me.id);
         if (chatData.messages[roomId].length > 500) chatData.messages[roomId] = chatData.messages[roomId].slice(-500);
         saveChat();
         sendJson(res, 200, { message: msg });
@@ -1085,6 +1105,64 @@ function noteLoginAccountFail(key) {
   const rec = loginFailsByAccount[key];
   if (!rec || now - rec.first > 10 * 60 * 1000) loginFailsByAccount[key] = { count: 1, first: now };
   else rec.count += 1;
+}
+// ---------- Kuota AI + batas penyalahgunaan (S4, P1-N2) ----------
+// Kuota AI per pengguna per hari: env AI_QUOTA_PER_DAY (default 50;
+// "0" = tanpa batas; nilai tak valid/negatif -> default 50). Hari =
+// tanggal lokal server (YYYY-MM-DD), reset otomatis berganti hari.
+// Yang dihitung adalah attempt: panggilan chat yang lolos gate S1 +
+// allowlist S2 dan diteruskan ke provider (gagal provider tetap
+// dihitung). Hitungan disimpan di rutbhics-users.json (ikut saveUsers
+// atomik) pada tiap increment; hitungan di memori otoritatif selama
+// proses berjalan, sehingga kuota hari berjalan bertahan saat restart.
+// Hanya pengguna login yang dikenai kuota; pemakaian AI anonim mode
+// local dibebaskan karena hanya mungkin dari perangkat pemilik sendiri
+// (gate socket memblokir non-loopback) — kuota adalah kontrol multi-user.
+function localDay(d) {
+  const p = (n) => String(n).padStart(2, "0");
+  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+}
+function aiQuotaLimit() {
+  const raw = (process.env.AI_QUOTA_PER_DAY || "").trim();
+  if (raw === "0") return 0;
+  if (!/^\d+$/.test(raw)) return 50;
+  return parseInt(raw, 10);
+}
+function aiQuotaCheck(user) {
+  const limit = aiQuotaLimit();
+  if (limit === 0) return null;
+  if (!usersData.aiQuota || typeof usersData.aiQuota !== "object") usersData.aiQuota = {};
+  const today = localDay(new Date());
+  let rec = usersData.aiQuota[user.id];
+  if (!rec || rec.date !== today) { rec = { date: today, count: 0 }; usersData.aiQuota[user.id] = rec; }
+  if (rec.count >= limit) {
+    return { status: 429, error: "kuota_habis", message: "Kuota AI harian habis (" + limit + " panggilan/hari). Coba lagi besok." };
+  }
+  rec.count += 1;
+  saveUsers();
+  return null;
+}
+// Rate limit pesan per pengguna (S4): burst 10/menit + sustained
+// 100/jam, dihitung dari pesan yang tersimpan saja (baca tidak
+// dibatasi). Hanya di memori (window waktu berlalu sendiri); restart
+// mengatur ulang window — dapat diterima karena batas ini anti-spam,
+// bukan akuntansi. Array timestamp per pengguna dibatasi cap jam
+// (maks ~100 entri).
+const msgRateByUser = {};
+function msgRateCheck(userId) {
+  const now = Date.now();
+  let arr = msgRateByUser[userId];
+  if (!Array.isArray(arr)) arr = msgRateByUser[userId] = [];
+  arr = arr.filter((t) => t > now - 3600000);
+  msgRateByUser[userId] = arr;
+  const minute = arr.filter((t) => t > now - 60000).length;
+  if (minute >= 10) return { status: 429, error: "pesan_terlalu_cepat", message: "Terlalu banyak pesan dalam satu menit (maks 10). Tunggu sebentar." };
+  if (arr.length >= 100) return { status: 429, error: "batas_pesan_per_jam", message: "Batas pesan per jam tercapai (maks 100). Coba lagi nanti." };
+  return null;
+}
+function msgRateNote(userId) {
+  if (!Array.isArray(msgRateByUser[userId])) msgRateByUser[userId] = [];
+  msgRateByUser[userId].push(Date.now());
 }
 function oauthConfig(provider) {
   if (provider === "google") {
