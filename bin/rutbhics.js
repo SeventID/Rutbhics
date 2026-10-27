@@ -694,6 +694,30 @@ function slugRoom(name) {
   while (chatData.rooms.some((r) => r.id === id)) { id = s + "-" + i; i += 1; }
   return id;
 }
+// ---------- Visibilitas ruang (privat) ----------
+// Ruang lama tanpa field visibility = publik (kompatibilitas mundur,
+// tanpa migrasi data). Ruang privat hanya terlihat/dibaca/ditulis
+// anggotanya; pembuat selalu dianggap anggota (juga bila members
+// entah bagaimana tidak mencantumkannya). Serialisasi: publik hanya
+// {id, name, visibility}; privat untuk anggota ditambah createdBy +
+// members; non-anggota tidak pernah menerima objek ruang privat.
+function roomVisibility(room) {
+  return room && room.visibility === "private" ? "private" : "public";
+}
+function roomIsMember(room, username) {
+  if (!username) return false;
+  if (room && room.createdBy === username) return true;
+  return !!(room && Array.isArray(room.members) && room.members.includes(username));
+}
+function roomViewFor(room, me) {
+  if (roomVisibility(room) === "public") {
+    return { id: room.id, name: room.name, visibility: "public" };
+  }
+  if (me && roomIsMember(room, me.username)) {
+    return { id: room.id, name: room.name, visibility: "private", createdBy: room.createdBy || "", members: Array.isArray(room.members) ? room.members.slice() : [] };
+  }
+  return null;
+}
 function handleRooms(req, res) {
   if (req.method === "POST" && !isSameOriginWrite(req)) {
     sendJson(res, 403, { error: "origin_tidak_diizinkan" });
@@ -702,7 +726,13 @@ function handleRooms(req, res) {
   const url = new URL(req.url, "http://localhost");
   const parts = url.pathname.split("/").filter(Boolean); // ["api","rooms",id?,"messages"?]
   if (req.method === "GET" && parts.length === 2) {
-    sendJson(res, 200, { rooms: chatData.rooms });
+    const me = sessionUser(req);
+    const rooms = [];
+    for (const room of chatData.rooms) {
+      const view = roomViewFor(room, me);
+      if (view) rooms.push(view);
+    }
+    sendJson(res, 200, { rooms });
     return;
   }
   if (req.method === "POST" && parts.length === 2) {
@@ -713,12 +743,18 @@ function handleRooms(req, res) {
       try { input = JSON.parse(raw); } catch (e) { sendJson(res, 400, { error: "json_tidak_valid" }); return; }
       const name = typeof input.name === "string" ? input.name.trim() : "";
       if (!name || name.length > 50) { sendJson(res, 400, { error: "nama_ruang_tidak_valid" }); return; }
+      let visibility = "public";
+      if (input.visibility !== undefined && input.visibility !== null && input.visibility !== "") {
+        if (input.visibility !== "public" && input.visibility !== "private") { sendJson(res, 400, { error: "visibilitas_tidak_valid" }); return; }
+        visibility = input.visibility;
+      }
       if (chatData.rooms.length >= 20) { sendJson(res, 400, { error: "ruang_penuh" }); return; }
-      const room = { id: slugRoom(name), name: name.slice(0, 50) };
+      const room = { id: slugRoom(name), name: name.slice(0, 50), visibility, createdBy: me.username };
+      if (visibility === "private") room.members = [me.username];
       chatData.rooms.push(room);
       chatData.messages[room.id] = [];
       saveChat();
-      sendJson(res, 200, { room });
+      sendJson(res, 200, { room: roomViewFor(room, me) });
     }).catch(() => sendJson(res, 400, { error: "body_tidak_valid" }));
     return;
   }
@@ -727,6 +763,12 @@ function handleRooms(req, res) {
     if (!/^[a-z0-9-]{1,50}$/.test(roomId) || !chatData.messages[roomId]) {
       sendJson(res, 404, { error: "ruang_tidak_ditemukan" });
       return;
+    }
+    const room = chatData.rooms.find((r) => r.id === roomId);
+    if (roomVisibility(room) === "private") {
+      const gateMe = sessionUser(req);
+      if (!gateMe) { sendJson(res, 401, { error: "login_diperlukan" }); return; }
+      if (!roomIsMember(room, gateMe.username)) { sendJson(res, 403, { error: "bukan_anggota" }); return; }
     }
     if (req.method === "GET") {
       const since = parseInt(url.searchParams.get("since"), 10) || 0;
@@ -754,6 +796,30 @@ function handleRooms(req, res) {
       }).catch(() => sendJson(res, 400, { error: "body_tidak_valid" }));
       return;
     }
+  }
+  if (req.method === "POST" && parts.length === 4 && parts[3] === "members") {
+    const me = sessionUser(req);
+    if (!me) { sendJson(res, 401, { error: "login_diperlukan" }); return; }
+    const roomId = decodeURIComponent(parts[2]);
+    const room = chatData.rooms.find((r) => r.id === roomId);
+    if (!room || !chatData.messages[roomId]) { sendJson(res, 404, { error: "ruang_tidak_ditemukan" }); return; }
+    if (roomVisibility(room) === "public") { sendJson(res, 400, { error: "ruang_publik" }); return; }
+    if (room.createdBy !== me.username) { sendJson(res, 403, { error: "bukan_pembuat" }); return; }
+    readBody(req, 65536).then((raw) => {
+      let input;
+      try { input = JSON.parse(raw); } catch (e) { sendJson(res, 400, { error: "json_tidak_valid" }); return; }
+      const username = typeof input.username === "string" ? input.username.trim() : "";
+      if (!username) { sendJson(res, 400, { error: "username_tidak_valid" }); return; }
+      const user = usersData.users.find((u) => u.username.toLowerCase() === username.toLowerCase());
+      if (!user) { sendJson(res, 404, { error: "pengguna_tidak_ditemukan" }); return; }
+      if (!Array.isArray(room.members)) room.members = room.createdBy ? [room.createdBy] : [];
+      if (!room.members.includes(user.username)) {
+        room.members.push(user.username);
+        saveChat();
+      }
+      sendJson(res, 200, { ok: true, room: roomViewFor(room, me) });
+    }).catch(() => sendJson(res, 400, { error: "body_tidak_valid" }));
+    return;
   }
   sendJson(res, 404, { error: "tidak_ditemukan" });
 }
