@@ -1034,6 +1034,58 @@ function noteRegisterAttempt(ip) {
   if (!rec || now - rec.first > 60 * 60 * 1000) registerAttempts[ip] = { count: 1, first: now };
   else rec.count += 1;
 }
+// Throttle tahan proxy (S3, P1-N3): IP klien untuk throttle login/register.
+// TRUSTED_PROXIES = daftar alamat proxy tepercaya, dipisahkan koma
+// (default loopback saja: 127.0.0.1, ::1 — tanpa rentang CIDR pada tahap
+// ini, hanya pencocokan persis). Bila alamat socket adalah proxy tepercaya
+// DAN header X-Forwarded-For ada, pakai entri pertamanya sebagai IP klien;
+// bila tidak, XFF diabaikan total — klien langsung yang memalsukan XFF
+// tidak boleh menggeser anggaran orang lain. Dengan Nginx yang menimpa
+// XFF menjadi $remote_addr, XFF hanya berisi satu entri (klien asli).
+// Entri dipakai apa adanya (trim) sebagai kunci bucket throttle saja —
+// tidak pernah dipakai untuk kontrol akses — dan tidak divalidasi
+// formatnya; proxy yang menambahkan port akan membuat bucket per port,
+// jadi konfigurasikan proxy mengirim IP polos. Alamat loopback yang
+// dipetakan IPv4 (::ffff:127.0.0.1) dinormalisasi ke bentuk IPv4-nya agar
+// cocok dengan daftar tepercaya.
+function normProxyIp(a) {
+  let s = (a || "").trim().toLowerCase();
+  if (s.startsWith("::ffff:") && s.slice(7).includes(".")) s = s.slice(7);
+  return s;
+}
+function trustedProxies() {
+  const raw = (process.env.TRUSTED_PROXIES || "").trim();
+  if (!raw) return ["127.0.0.1", "::1"];
+  return raw.split(",").map((s) => normProxyIp(s)).filter(Boolean);
+}
+function clientIp(req) {
+  const sock = (req.socket && req.socket.remoteAddress) || "unknown";
+  if (!trustedProxies().includes(normProxyIp(sock))) return sock;
+  const xff = req.headers["x-forwarded-for"];
+  if (!xff) return sock;
+  const first = xff.split(",")[0].trim();
+  return first || sock;
+}
+// Throttle login per AKUN (S3): di samping per IP, agar serangan terhadap
+// satu akun tidak mengunci semua akun (dan sebaliknya). Ambang sama
+// dengan throttle IP: 10 gagal per akun per 10 menit. Kunci: "u:<id>"
+// untuk pengguna yang ditemukan (username/email/HP apa pun yang dipakai
+// menuju akun yang sama), "i:<identifier>" untuk identifier tak dikenal
+// — agar percobaan terhadap nama yang belum terdaftar tidak mengunci akun
+// yang baru dibuat kemudian (kuncinya berbeda).
+const loginFailsByAccount = {};
+function loginAccountBlocked(key) {
+  const rec = loginFailsByAccount[key];
+  if (!rec) return false;
+  if (Date.now() - rec.first > 10 * 60 * 1000) { delete loginFailsByAccount[key]; return false; }
+  return rec.count >= 10;
+}
+function noteLoginAccountFail(key) {
+  const now = Date.now();
+  const rec = loginFailsByAccount[key];
+  if (!rec || now - rec.first > 10 * 60 * 1000) loginFailsByAccount[key] = { count: 1, first: now };
+  else rec.count += 1;
+}
 function oauthConfig(provider) {
   if (provider === "google") {
     return process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
@@ -1152,7 +1204,7 @@ function handleAuth(req, res) {
       if (email && !validEmail(email)) { sendJson(res, 400, { error: "email_tidak_valid" }); return; }
       if (phone && !validPhone(phone)) { sendJson(res, 400, { error: "hp_tidak_valid" }); return; }
       if (!password || password.length < 8) { sendJson(res, 400, { error: "password_terlalu_pendek" }); return; }
-      const regIp = (req.socket && req.socket.remoteAddress) || "unknown";
+      const regIp = clientIp(req);
       if (registerBlocked(regIp)) { sendJson(res, 429, { error: "pendaftaran_dibatasi" }); return; }
       noteRegisterAttempt(regIp);
       // Pesan generik (P1-4): jangan bocorkan field mana yang sudah dipakai.
@@ -1171,7 +1223,7 @@ function handleAuth(req, res) {
     return;
   }
   if (req.method === "POST" && action === "login" && parts.length === 3) {
-    const ip = (req.socket && req.socket.remoteAddress) || "unknown";
+    const ip = clientIp(req);
     if (loginBlocked(ip)) { sendJson(res, 429, { error: "terlalu_banyak_percobaan" }); return; }
     readBody(req, 65536).then((raw) => {
       let input;
@@ -1183,12 +1235,16 @@ function handleAuth(req, res) {
         u.username.toLowerCase() === identifier.toLowerCase() ||
         (u.email && u.email.toLowerCase() === identifier.toLowerCase()) ||
         (u.phone && phoneId && u.phone === phoneId));
+      const accountKey = user ? ("u:" + user.id) : ("i:" + identifier.toLowerCase());
+      if (loginAccountBlocked(accountKey)) { sendJson(res, 429, { error: "terlalu_banyak_percobaan" }); return; }
       if (!user || !user.passHash || !checkPassword(password, user.passHash)) {
         noteLoginFail(ip);
+        noteLoginAccountFail(accountKey);
         sendJson(res, 401, { error: "kredensial_salah" });
         return;
       }
       delete loginFails[ip];
+      delete loginFailsByAccount[accountKey];
       const token = createSession(user.id);
       setSessionCookie(res, token);
       sendJson(res, 200, { user: publicUser(user) });
@@ -1341,6 +1397,7 @@ const port = parsePort(process.argv.slice(2));
 const host = parseHost(process.argv.slice(2));
 aiAccessMode = resolveAiAccessMode(host);
 console.log("[rutbhics] AI access mode: " + aiAccessMode + (aiAccessMode === "local" ? " (loopback only, must not be proxied)" : " (session required)"));
+console.log("[rutbhics] TRUSTED_PROXIES: " + trustedProxies().join(", ") + " (XFF hanya dipercaya dari daftar ini)");
 if (aiAccessMode === "local" && (process.env.AI_ACCESS || "").trim().toLowerCase() === "local" && !isLoopbackHostName(host)) {
   console.error("[rutbhics] PERINGATAN KERAS: mode local dipilih eksplisit (AI_ACCESS=local) dengan host non-loopback (" + host + ") — server dapat dijangkau jaringan; bila server ini diekspos lewat proxy/domain publik, kunci AI terbuka. Pindah ke mode login (AI_ACCESS=login). Mode tetap local sesuai pilihan operator.");
 }

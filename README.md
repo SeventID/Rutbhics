@@ -205,7 +205,8 @@ Metode yang tersedia:
    pun yang didaftarkan. Kata sandi disimpan sebagai hash scrypt +
    salt di berkas `rutbhics-users.json` di folder kerja (bukan hash
    browser seperti login lokal). Sesi memakai cookie httpOnly 30 hari.
-   Login dibatasi 10 percobaan gagal per IP per 10 menit.
+   Login dibatasi 10 percobaan gagal per IP per 10 menit, dan 10
+   percobaan gagal per akun per 10 menit (S3).
 2. **Google / GitHub (OAuth).** Tombolnya muncul di pane multi-user
    hanya bila server dikonfigurasi. Caranya: buat OAuth app
    (Google Cloud Console → Credentials → OAuth client ID, atau GitHub
@@ -377,8 +378,48 @@ location / {
   proxy_http_version 1.1;
   proxy_set_header Host $host;
   proxy_set_header X-Real-IP $remote_addr;
+  # WAJIB MENIMPA (bukan menambah): $remote_addr, bukan
+  # $proxy_add_x_forwarded_for — lihat penjelasan di bawah.
+  proxy_set_header X-Forwarded-For $remote_addr;
 }
 ```
+
+**Throttle di balik proxy (S3) — baca sebelum memakai Nginx di atas.**
+Throttle login/register dihitung per IP klien. Bila server diakses lewat
+proxy, IP socket yang dilihat server adalah alamat proxy itu sendiri,
+sehingga tanpa penanganan semua pengguna berbagi satu anggaran throttle
+(satu penyerang dapat mengunci login/registrasi semua orang). S3
+memperbaikinya dengan aturan berikut:
+
+- `TRUSTED_PROXIES` (env, default loopback saja: `127.0.0.1,::1`)
+  adalah daftar alamat proxy tepercaya, dipisahkan koma, pencocokan
+  persis (tanpa rentang CIDR pada tahap ini). Bila alamat socket ada di
+  daftar ini DAN header `X-Forwarded-For` ada, entri pertamanya dipakai
+  sebagai IP klien untuk throttle. Bila alamat socket tidak ada di daftar
+  ini, `X-Forwarded-For` diabaikan total — klien langsung yang memalsukan
+  header itu tidak boleh menggeser anggaran orang lain.
+- **Cuplikan Nginx di atas WAJIB menimpa `X-Forwarded-For` menjadi
+  `$remote_addr`.** Nilai default Nginx, `$proxy_add_x_forwarded_for`,
+  justru MENAMBAH (append): klien dapat mengirim `X-Forwarded-For`
+  palsu, dan entri palsu itu menjadi entri pertama yang dibaca server —
+  throttle salah sasaran. Dengan menimpa menjadi `$remote_addr`,
+  `X-Forwarded-For` hanya berisi satu entri: IP asli klien. Untuk proxy
+  di alamat lain (bukan loopback), setel `TRUSTED_PROXIES` ke alamat
+  proxy itu (mis. di unit systemd: `Environment=TRUSTED_PROXIES=10.0.0.5`,
+  atau di `.env`); untuk Nginx di host yang sama, default loopback sudah
+  cukup.
+- Login juga dibatasi **per akun**: 10 percobaan gagal per akun per
+  10 menit, di samping batas per IP. Jadi serangan terhadap satu akun
+  tidak mengunci semua akun, dan satu IP tidak bisa membanjiri satu akun
+  tanpa batas.
+- Batas lama tidak berubah: login 10 gagal/IP/10 menit, registrasi
+  5 percobaan/IP/jam — hanya saja "IP" kini berarti IP klien yang
+  sudah memperhitungkan proxy tepercaya.
+- Catatan batas: koneksi langsung dari loopback berbagi kelas kepercayaan
+  dengan proxy loopback (keduanya tidak dapat dibedakan dari alamat
+  socket saja) — host server sendiri diasumsikan tepercaya. Bila itu
+  tidak dapat diterima, jalankan proxy di alamat khusus dan persempit
+  `TRUSTED_PROXIES` ke alamat itu saja.
 
 HTTPS: `certbot --nginx -d namadomain.example` (atau DNS-01 bila perlu).
 Untuk deployment publik, setel `OAUTH_REDIRECT_BASE=https://namadomain.example`
@@ -410,6 +451,8 @@ curl https://namadomain.example/health   # -> {"ok":true}
 journalctl -u rutbhics -f
 ```
 
-Catatan: throttle login/register memakai IP socket mentah dan TIDAK
-memercayai `X-Forwarded-For` (sengaja, agar tidak bisa dipalsukan) — di
-balik proxy bersama, semua pengguna berbagi satu anggaran throttle.
+Catatan: throttle login/register memakai IP klien yang sudah
+memperhitungkan proxy tepercaya (S3): `X-Forwarded-For` hanya dipercaya
+bila koneksi datang dari alamat di `TRUSTED_PROXIES` (default loopback
+saja); dari alamat lain header itu diabaikan total. Lihat penjelasan
+"Throttle di balik proxy (S3)" di bawah cuplikan Nginx di atas.
