@@ -314,11 +314,21 @@ HTTPS: `certbot --nginx -d namadomain.example` (atau DNS-01 bila perlu).
 Untuk deployment publik, setel `OAUTH_REDIRECT_BASE=https://namadomain.example`
 di `.env` agar callback OAuth tidak bergantung pada header Host.
 
-**Backup** (rutin, ke lokasi di luar folder aplikasi):
+**Backup** (manual, ke lokasi di luar folder aplikasi):
 
 ```sh
-cp rutbhics-users.json rutbhics-chat.json .env /var/backups/rutbhics/
+node scripts/backup.js                 # -> ~/rutbhics-backup/rutbhics-backup-YYYYMMDD-HHmmss/
+node scripts/backup.js --dir /var/backups/rutbhics
 ```
+
+Menyalin `rutbhics-users.json`, `rutbhics-chat.json`, `.env` (plus
+`.bak` bila ada) dari folder kerja — atau folder paket bila tidak ada di
+folder kerja — beserta `manifest.json` (daftar berkas + sumbernya).
+Salinan `.env` ditulis mode 600. Direktori backup di dalam folder
+aplikasi ditolak (berkasnya bisa dilayani sebagai berkas statis).
+Memulihkan: salin kembali berkasnya ke folder kerja lalu restart server.
+Penjadwalan otomatis (cron/systemd) tidak dipasang — pasang sendiri
+bila perlu.
 
 Berkas `.bak` di folder yang sama adalah cadangan generasi terakhir bila
 berkas utama korup.

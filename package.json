@@ -25,7 +25,8 @@
   "scripts": {
     "start": "node bin/rutbhics.js",
     "postinstall": "node scripts/postinstall.js",
-    "test": "node --check bin/rutbhics.js && node --check js/apps.js && node --check js/desktop.js && node --check scripts/postinstall.js && node --check scripts/setup-larprouter.js && node scripts/smoke.js"
+    "test": "node --check bin/rutbhics.js && node --check js/apps.js && node --check js/desktop.js && node --check scripts/postinstall.js && node --check scripts/setup-larprouter.js && node --check scripts/backup.js && node scripts/smoke.js",
+    "backup": "node scripts/backup.js"
   },
   "version": "1.0.3",
   "engines": {
