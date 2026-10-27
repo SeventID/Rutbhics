@@ -385,6 +385,22 @@ function isLoopback(req) {
   return a === "127.0.0.1" || a === "::1" || a === "::ffff:127.0.0.1";
 }
 
+// Origin yang diizinkan untuk endpoint loopback (/api/chat, /api/models):
+// tanpa Origin, atau Origin dengan host loopback (localhost/127.0.0.1/::1,
+// skema http/https, port berapa pun). Origin asing ditolak — gate loopback
+// saja tidak cukup karena request browser korban juga berasal dari
+// loopback (P1-2).
+function isLoopbackOrigin(req) {
+  const origin = req.headers.origin;
+  if (!origin) return true;
+  try {
+    const u = new URL(origin);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return false;
+    const h = u.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+    return h === "localhost" || h === "127.0.0.1" || h === "::1";
+  } catch (e) { return false; }
+}
+
 function sendJson(res, status, obj) {
   const body = JSON.stringify(obj);
   res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
@@ -412,6 +428,10 @@ function handleChat(req, res) {
   // dipakai perangkat lain yang se-jaringan.
   if (!isLoopback(req)) {
     sendJson(res, 403, { error: "forbidden", message: "Endpoint /api/chat hanya untuk pemakaian lokal." });
+    return;
+  }
+  if (!isLoopbackOrigin(req)) {
+    sendJson(res, 403, { error: "origin_tidak_diizinkan", message: "Origin tidak diizinkan untuk endpoint lokal." });
     return;
   }
   if (req.method === "GET") {
@@ -502,6 +522,10 @@ function handleChat(req, res) {
 async function handleModels(req, res) {
   if (!isLoopback(req)) {
     sendJson(res, 403, { error: "forbidden", message: "Endpoint /api/models hanya untuk pemakaian lokal." });
+    return;
+  }
+  if (!isLoopbackOrigin(req)) {
+    sendJson(res, 403, { error: "origin_tidak_diizinkan", message: "Origin tidak diizinkan untuk endpoint lokal." });
     return;
   }
   if (req.method !== "GET") {
