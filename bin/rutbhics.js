@@ -696,6 +696,7 @@ const USERS_FILE = path.join(process.cwd(), "rutbhics-users.json");
 let usersData = { users: [], sessions: {} };
 const loadedUsers = loadJsonWithBackup(USERS_FILE, (x) => x && Array.isArray(x.users) && x.sessions && typeof x.sessions === "object");
 if (loadedUsers) usersData = loadedUsers;
+pruneSessions(true);
 function saveUsers() {
   atomicSave(USERS_FILE, usersData);
 }
@@ -728,8 +729,23 @@ function sessionUser(req) {
   if (!m) return null;
   const token = m.slice("rutbhics_token=".length);
   const sess = usersData.sessions[token];
-  if (!sess || sess.expires < Date.now()) return null;
+  if (!sess) return null;
+  if (sess.expires < Date.now()) { delete usersData.sessions[token]; return null; }
   return usersData.users.find((u) => u.id === sess.userId) || null;
+}
+// Prune sesi kedaluwarsa (P1-5): hapus dari memori; simpan hanya bila
+// diminta (agar operasi baca tidak memicu tulis tiap request).
+function pruneSessions(persist) {
+  const now = Date.now();
+  let removed = 0;
+  for (const tk of Object.keys(usersData.sessions)) {
+    if (!usersData.sessions[tk] || usersData.sessions[tk].expires < now) {
+      delete usersData.sessions[tk];
+      removed += 1;
+    }
+  }
+  if (removed && persist) saveUsers();
+  return removed;
 }
 function setSessionCookie(res, token) {
   res.setHeader("Set-Cookie", "rutbhics_token=" + token + "; HttpOnly; Path=/; SameSite=Lax; Max-Age=2592000");
@@ -845,6 +861,7 @@ function oauthFail(res, msg) {
   res.end("<h1>Login gagal</h1><p>" + msg + "</p><p><a href='/'>Kembali ke Rutbhics</a></p>");
 }
 function handleAuth(req, res) {
+  pruneSessions(false);
   const url = new URL(req.url, "http://localhost");
   const parts = url.pathname.split("/").filter(Boolean); // ["api","auth",...]
   const action = parts[2] || "";
@@ -865,6 +882,21 @@ function handleAuth(req, res) {
     saveUsers();
     clearSessionCookie(res);
     sendJson(res, 200, { ok: true });
+    return;
+  }
+  if (req.method === "POST" && action === "logout-all" && parts.length === 3) {
+    const me = sessionUser(req);
+    if (!me) { sendJson(res, 401, { error: "login_diperlukan" }); return; }
+    let revoked = 0;
+    for (const tk of Object.keys(usersData.sessions)) {
+      if (usersData.sessions[tk] && usersData.sessions[tk].userId === me.id) {
+        delete usersData.sessions[tk];
+        revoked += 1;
+      }
+    }
+    saveUsers();
+    clearSessionCookie(res);
+    sendJson(res, 200, { ok: true, revoked });
     return;
   }
   if (req.method === "POST" && action === "register" && parts.length === 3) {
@@ -1067,6 +1099,7 @@ const server = http.createServer((req, res) => {
     res.end("Terjadi kesalahan");
   }
 });
+setInterval(() => pruneSessions(true), 60 * 60 * 1000).unref();
 server.listen(port, host, () => {
   console.log("Rutbhics berjalan di http://" + host + ":" + port + (host === "0.0.0.0" ? " (semua interface)" : ""));
   if (host === "0.0.0.0") {

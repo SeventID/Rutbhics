@@ -42,6 +42,8 @@
     authPhone: { id: "HP (opsional)", en: "Phone (optional)" },
     authPassword: { id: "Kata sandi (min. 8 karakter)", en: "Password (min. 8 characters)" },
     authLogout: { id: "Keluar", en: "Log out" },
+    authLogoutAll: { id: "Keluar dari semua perangkat", en: "Log out from all devices" },
+    authLogoutAllConfirm: { id: "Keluar dari semua perangkat, termasuk sesi di perangkat lain?", en: "Log out from all devices, including sessions on other devices?" },
     authAs: { id: "Masuk sebagai {name}", en: "Logged in as {name}" },
     authLoginGoogle: { id: "Login dengan Google", en: "Log in with Google" },
     authLoginGithub: { id: "Login dengan GitHub", en: "Log in with GitHub" },
@@ -250,8 +252,10 @@
     var authStatus = el('<p class="hint"></p>');
     var authLogout = el('<button class="chip"></button>');
     authLogout.textContent = tr("authLogout");
+    var authLogoutAll = el('<button class="chip"></button>');
+    authLogoutAll.textContent = tr("authLogoutAll");
     var authStatusRow = el('<div class="chat-model-row"></div>');
-    authStatusRow.appendChild(authStatus); authStatusRow.appendChild(authLogout);
+    authStatusRow.appendChild(authStatus); authStatusRow.appendChild(authLogout); authStatusRow.appendChild(authLogoutAll);
     var authForm = el('<div></div>');
     var authModeRow = el('<div class="chat-model-row"></div>');
     var authLoginTab = el('<button class="chip active"></button>');
@@ -362,6 +366,15 @@
     authRegisterPass.addEventListener("keydown", function (e) { if (e.key === "Enter") authSubmitHandler(); });
     authLogout.addEventListener("click", function () {
       fetch("/api/auth/logout", { method: "POST" }).then(function () {
+        authUser = null;
+        renderAuth();
+      }).catch(function () { authUser = null; renderAuth(); });
+    });
+    authLogoutAll.addEventListener("click", function () {
+      var ok = true;
+      try { ok = typeof confirm === "function" ? confirm(tr("authLogoutAllConfirm")) : true; } catch (e) { ok = true; }
+      if (!ok) return;
+      fetch("/api/auth/logout-all", { method: "POST" }).then(function () {
         authUser = null;
         renderAuth();
       }).catch(function () { authUser = null; renderAuth(); });
