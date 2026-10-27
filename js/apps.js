@@ -32,6 +32,8 @@
   var TR = {
     chatPlaceholder: { id: "Tulis pesan...", en: "Write a message..." },
     chatModel: { id: "Model AI:", en: "AI model:" },
+    chatReplyLang: { id: "Bahasa balasan:", en: "Reply language:" },
+    chatLangAuto: { id: "Ikuti bahasa UI", en: "Follow UI language" },
     chatSend: { id: "Kirim", en: "Send" },
     chatHintOff: { id: "Kontak ini menjawab pakai AI Larprouter bila server lokal rutbhics + .env sudah disiapkan.", en: "This contact replies with Larprouter AI once the local rutbhics server + .env are set up." },
     chatHintOn: { id: "AI aktif (model {model}).", en: "AI is active (model {model})." },
@@ -179,7 +181,58 @@
         }).catch(function () { /* tetap pakai daftar cadangan */ });
       }
     } catch (e) { /* abaikan */ }
-    mainEl.appendChild(msgsEl); mainEl.appendChild(modelRow); mainEl.appendChild(inputRow); mainEl.appendChild(hintEl);
+    // Bahasa balasan AI (multi-bahasa chat): bisa dipilih sendiri, tidak
+    // harus sama dengan bahasa UI. "auto" = ikuti bahasa UI. Untuk
+    // Indonesia/Inggris dipakai persona lengkap yang sudah ada; untuk
+    // bahasa lain dipakai persona Inggris + arahan "Reply in ...".
+    var CHAT_LANGS = [
+      { code: "id", name: "Bahasa Indonesia", reply: "Indonesian" },
+      { code: "en", name: "English", reply: "English" },
+      { code: "ja", name: "日本語 (Japanese)", reply: "Japanese" },
+      { code: "ko", name: "한국어 (Korean)", reply: "Korean" },
+      { code: "zh", name: "中文 (Chinese)", reply: "Chinese" },
+      { code: "ar", name: "العربية (Arabic)", reply: "Arabic" },
+      { code: "es", name: "Español (Spanish)", reply: "Spanish" },
+      { code: "fr", name: "Français (French)", reply: "French" },
+      { code: "de", name: "Deutsch (German)", reply: "German" },
+      { code: "pt", name: "Português (Portuguese)", reply: "Portuguese" }
+    ];
+    function chatLangEffective() {
+      var saved = null;
+      try { saved = localStorage.getItem("wd-chat-lang"); } catch (e) {}
+      if (!saved || saved === "auto") return langNow();
+      return saved;
+    }
+    function personaFor(contact) {
+      var eff = chatLangEffective();
+      if (eff === "id" || eff === "en") return PERSONAS[eff][contact];
+      var entry = null;
+      CHAT_LANGS.forEach(function (l) { if (l.code === eff) entry = l; });
+      var replyName = entry ? entry.reply : "English";
+      return PERSONAS.en[contact] + " Reply in " + replyName + ".";
+    }
+    var langRow = el('<div class="chat-model-row"></div>');
+    var langLabel = el('<span class="hint" style="margin:0"></span>');
+    langLabel.textContent = tr("chatReplyLang");
+    var langSelect = document.createElement("select");
+    langSelect.className = "chat-model chat-lang";
+    var langAuto = document.createElement("option");
+    langAuto.value = "auto"; langAuto.textContent = tr("chatLangAuto");
+    langSelect.appendChild(langAuto);
+    CHAT_LANGS.forEach(function (l) {
+      var o = document.createElement("option");
+      o.value = l.code; o.textContent = l.name;
+      langSelect.appendChild(o);
+    });
+    try {
+      var savedLang = localStorage.getItem("wd-chat-lang");
+      langSelect.value = (savedLang && (savedLang === "auto" || CHAT_LANGS.some(function (l) { return l.code === savedLang; }))) ? savedLang : "auto";
+    } catch (e) { langSelect.value = "auto"; }
+    langSelect.addEventListener("change", function () {
+      try { localStorage.setItem("wd-chat-lang", langSelect.value); } catch (e) {}
+    });
+    langRow.appendChild(langLabel); langRow.appendChild(langSelect);
+    mainEl.appendChild(msgsEl); mainEl.appendChild(modelRow); mainEl.appendChild(langRow); mainEl.appendChild(inputRow); mainEl.appendChild(hintEl);
     wrap.appendChild(listEl); wrap.appendChild(mainEl);
     body.appendChild(wrap);
 
@@ -220,7 +273,7 @@
       fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: history, system: PERSONAS[langNow()][active], model: modelSelect.value })
+        body: JSON.stringify({ messages: history, system: personaFor(active), model: modelSelect.value })
       }).then(function (r) {
         return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; });
       }).then(function (res) {

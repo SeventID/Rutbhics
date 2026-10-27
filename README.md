@@ -133,6 +133,11 @@ Catatan:
   dan dikirim sebagai field `model` di `POST /api/chat`. Model bawaan server
   tetap `deepseek-v4.1-flash` (bisa diubah lewat `LARPROUTER_MODEL` di `.env`;
   model utama `claude-opus-4-7-1m` bisa dipilih begitu kreditnya cukup).
+- Multi-bahasa chat: dropdown "Bahasa balasan" di Obrolan — bisa "Ikuti
+  bahasa UI" atau dipilih sendiri (Indonesia, Inggris, Jepang, Korea,
+  Mandarin, Arab, Spanyol, Prancis, Jerman, Portugis); persona AI
+  disesuaikan dengan bahasa yang dipilih, pilihan tersimpan di perangkat
+  (`wd-chat-lang`).
 - Kunci tidak pernah masuk repo, tidak pernah dikirim ke browser: browser hanya
   memanggil `POST /api/chat` di server lokal, kunci dibaca server dari `.env`.
   Server juga tidak pernah melayani berkas `.env` sebagai berkas statis, dan
