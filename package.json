@@ -15,7 +15,7 @@
     ".env.example"
   ],
   "homepage": "https://github.com/SeventID/Rutbhics#readme",
-  "license": "MIT",
+  "license": "BSD-3-Clause",
   "name": "rutbhics",
   "repository": {
     "type": "git",
