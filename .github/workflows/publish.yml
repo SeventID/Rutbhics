@@ -30,6 +30,8 @@ jobs:
       # Tanpa npm install: package ini tanpa dependensi.
       - name: Pakai npm terbaru (dukungan OIDC)
         run: npm install -g npm@latest
+      - name: Test (node --check + smoke server)
+        run: npm test
       - name: Cek isi package (dry run)
         run: npm pack --dry-run
       - name: Publish ke npm
