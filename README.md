@@ -479,3 +479,60 @@ memperhitungkan proxy tepercaya (S3): `X-Forwarded-For` hanya dipercaya
 bila koneksi datang dari alamat di `TRUSTED_PROXIES` (default loopback
 saja); dari alamat lain header itu diabaikan total. Lihat penjelasan
 "Throttle di balik proxy (S3)" di bawah cuplikan Nginx di atas.
+
+## 🧪 Pengujian
+
+Rangkaian regresi repo (S11, zero-dependency, Node saja) dijalankan dengan:
+
+```sh
+npm test
+```
+
+Isi rantai: `node --check` atas semua JS (server, klien, skrip, tes) +
+`smoke.js` + rangkaian server + rangkaian klien + pemeriksaan skrip
+inline HTML + uji negatif. Semua tes memakai nilai dummy dan mematikan
+server/relay-nya sendiri; tidak ada kunci, token, atau data pengguna asli
+di berkas tes.
+
+| Berkas | Cakupan |
+| --- | --- |
+| `scripts/smoke.js` | Dasar: `/`, header keamanan, berkas data statis 404, rooms, login `identifier` (benar 200 / salah 401 / tak dikenal 401), chat tanpa kunci 502/503, models, health |
+| `scripts/test-s1.js` | Gate AI S1: mode local/login, matriks 7 baris untuk chat POST + GET status + models, Origin palsu via relay TCP Node, validasi sesi (sampah, logout, logout-all, kedaluwarsa), cakupan rute, mode turunan/eksplisit, peringatan proxy |
+| `scripts/test-s2.js` | Allowlist S2: provider/model dikenal & fiktif, live-list + cache 5 menit, nama model ber-`:` di config, urutan gate-lalu-allowlist |
+| `scripts/test-s3.js` | Throttle S3: hitungan persis login/register, XFF tepercaya vs tak tepercaya, throttle per-akun, `TRUSTED_PROXIES` kustom |
+| `scripts/test-s4.js` | Kuota S4: habis -> 429 + persistensi restart + ganti hari, pengecualian anonim local, env `0`/bogus/negatif, burst pesan 10/menit, batas ruang 5/pengguna + cap global 20 |
+| `scripts/test-client-p2.js` | DOM sim P2: logout desktop (L7), sandbox iframe, cap chat 200, banner gagal simpan |
+| `scripts/test-client-p3.js` | DOM sim P3: autosave + pencarian Catatan, resize jendela |
+| `scripts/test-client-rooms.js` | DOM sim ruang privat: opsi + gembok, baris tambah anggota, dropdown visibilitas, hint 403 |
+| `scripts/test-backup.js` | Skrip backup: salinan byte-identik, manifest, mode `.env` 600, penolakan direktori di dalam folder aplikasi |
+| `scripts/check-inline-html.js` | Ekstrak blok `<script>` inline dari `index.html`/`login.html` lalu `node --check` masing-masing |
+| `scripts/test-negative-gate.js` | Uji negatif: melonggarkan gate S1 di salinan staging, rangkaian test-s1 HARUS gagal pada tes kunci Origin PALSU |
+| `scripts/test-harness.js` | Utilitas bersama tes server (bukan tes sendiri): tree temp, server, relay TCP Node murni, register/login |
+
+Menjalankan satu berkas saja: `node scripts/test-s1.js` (dan seterusnya).
+Variasi mode logout desktop: `L7MODE=fetch node scripts/test-client-p2.js`
+atau `L7MODE=none ...` (default beacon; ketiganya dijalankan `npm test`).
+Relay socat pada skrip staging lama diganti relay TCP Node murni di
+`test-harness.js`, jadi CI tidak butuh instalasi apt.
+
+**Lokasi rangkaian:** rangkaian tinggal di `scripts/` (bukan `tests/`)
+karena field `files` di `package.json` sudah mencakup `scripts/` — jadi
+rangkaian ikut terkirim dalam paket npm dan `npm test` tetap lolos dari
+paket terinstal, bukan hanya dari repo.
+
+**Ambang sustained 100/jam (sisa yang diketahui):** ambang burst
+10/menit dites live, dan kedua ambang dievaluasi `msgRateCheck` yang
+sama pada setiap pesan tersimpan, tetapi ambang 100/jam yang sustained
+TIDAK dites live dalam rantai cepat (butuh ~10 menit jeda burst).
+Tes manualnya tersedia terpisah — JANGAN dimasukkan ke `npm test`:
+
+```sh
+node scripts/test-s4-sustained-manual.js   # ~10 menit: 100 pesan -> 200, pesan ke-101 -> 429 batas_pesan_per_jam
+```
+
+**Yang TIDAK dicakup rangkaian ini:** render browser sungguhan
+(DOM sim memakai stub, bukan browser), alur OAuth end-to-end (butuh
+aplikasi OAuth asli), uji beban/konkurensi, dan tes sustained 100/jam
+di atas (manual). Usulan (belum diimplementasikan, butuh persetujuan):
+seam injeksi untuk jendela rate-limit (mis. env khusus tes) agar ambang
+jam bisa dites cepat tanpa mengubah perilaku produksi.

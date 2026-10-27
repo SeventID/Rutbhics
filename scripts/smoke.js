@@ -77,8 +77,18 @@ async function main() {
       }
       const rooms = await req(port, "GET", "/api/rooms");
       check(rooms.status === 200, "GET /api/rooms -> 200");
-      const loginBad = await req(port, "POST", "/api/auth/login", { "Content-Type": "application/json" }, JSON.stringify({ username: "tidakada", password: "salahsalah" }));
+      // S11: login memakai field `identifier` (bukan `username`) dan menguji
+      // kredensial benar-salah yang sesungguhnya. Smoke lama lolos 401 dengan
+      // alasan salah: login membaca `identifier`, jadi kiriman `username`
+      // menghasilkan identifier kosong, bukan kredensial yang diuji.
+      const regSm = await req(port, "POST", "/api/auth/register", { "Content-Type": "application/json" }, JSON.stringify({ username: "smokeuser", password: "rahasia123", email: "smokeuser@contoh.test" }));
+      check(regSm.status === 200, "POST /api/auth/register pengguna smoke -> 200");
+      const loginOk = await req(port, "POST", "/api/auth/login", { "Content-Type": "application/json" }, JSON.stringify({ identifier: "smokeuser", password: "rahasia123" }));
+      check(loginOk.status === 200, "POST /api/auth/login kredensial benar -> 200");
+      const loginBad = await req(port, "POST", "/api/auth/login", { "Content-Type": "application/json" }, JSON.stringify({ identifier: "smokeuser", password: "salahsalah" }));
       check(loginBad.status === 401, "POST /api/auth/login kredensial salah -> 401");
+      const loginUnknown = await req(port, "POST", "/api/auth/login", { "Content-Type": "application/json" }, JSON.stringify({ identifier: "tidakada", password: "salahsalah" }));
+      check(loginUnknown.status === 401, "POST /api/auth/login identifier tak dikenal -> 401");
       const chat = await req(port, "POST", "/api/chat", { "Content-Type": "application/json" }, JSON.stringify({ messages: [{ role: "user", content: "halo" }] }));
       check((chat.status === 502 || chat.status === 503) && chat.body.includes("error"), "POST /api/chat tanpa kunci -> 502/503 jujur");
       const models = await req(port, "GET", "/api/models");
