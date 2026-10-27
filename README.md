@@ -24,6 +24,12 @@ rutbhics
 Port bisa diubah: `rutbhics --port 3000` atau `PORT=3000 rutbhics`.
 Tanpa install permanen: `npx rutbhics`.
 
+Akses dari perangkat lain: secara bawaan server hanya mendengarkan
+localhost. Untuk LAN, jalankan `rutbhics --host 0.0.0.0` lalu buka
+`http://<IP-perangkat-server>:8080` dari perangkat lain. Untuk akses
+internet, JANGAN membuka port langsung — pakai reverse proxy (mis. Nginx)
++ HTTPS + firewall.
+
 **Tanpa install** — buka `index.html` langsung di browser, atau dari terminal:
 
 ```bash

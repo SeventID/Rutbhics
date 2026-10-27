@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Rutbhics — server lokal, tanpa dependensi.
-// Pakai: rutbhics [--port 8080]  atau  PORT=8080 rutbhics
+// Pakai: rutbhics [--port 8080] [--host 127.0.0.1]  atau  PORT=8080 rutbhics
 //        rutbhics --setup   (tanya & simpan kunci Larprouter ke .env folder kerja)
 // Lalu buka http://localhost:8080 di browser.
 //
@@ -366,6 +366,18 @@ function parsePort(argv) {
   const c = parseInt(USER_CONFIG.port, 10);
   if (valid(c)) return c;
   return 8080;
+}
+
+function parseHost(argv) {
+  // Default loopback (P1-1): server hanya mendengarkan 127.0.0.1 kecuali
+  // operator meminta lain lewat --host (mis. 0.0.0.0 untuk LAN).
+  const i = argv.indexOf("--host");
+  if (i !== -1 && argv[i + 1]) {
+    const h = argv[i + 1].trim();
+    if (/^[A-Za-z0-9.:-]+$/.test(h)) return h;
+    console.error("[rutbhics] --host tidak valid (" + h + "), pakai 127.0.0.1.");
+  }
+  return "127.0.0.1";
 }
 
 function isLoopback(req) {
@@ -922,6 +934,7 @@ if (process.argv.includes("--setup")) {
 }
 
 const port = parsePort(process.argv.slice(2));
+const host = parseHost(process.argv.slice(2));
 const server = http.createServer((req, res) => {
   try {
     const url = new URL(req.url, "http://localhost");
@@ -972,8 +985,11 @@ const server = http.createServer((req, res) => {
     res.end("Terjadi kesalahan");
   }
 });
-server.listen(port, () => {
-  console.log("Rutbhics berjalan di http://localhost:" + port);
+server.listen(port, host, () => {
+  console.log("Rutbhics berjalan di http://" + host + ":" + port + (host === "0.0.0.0" ? " (semua interface)" : ""));
+  if (host === "0.0.0.0") {
+    console.log("PERINGATAN: server terbuka ke jaringan — pakai firewall/reverse proxy, jangan biarkan port terbuka ke internet tanpa perlindungan.");
+  }
   console.log("Buka alamat itu di browser. Tekan Ctrl+C untuk berhenti.");
   const activeIds = activeProviders().map((p) => p.id);
   if (activeIds.length) {
