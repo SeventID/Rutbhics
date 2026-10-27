@@ -15,6 +15,60 @@
   var startGrid = document.getElementById("start-grid");
   var startSearch = document.getElementById("start-search");
 
+  // ---------- Mode multi-bahasa (Indonesia/Inggris) ----------
+  // Bahasa tersimpan di localStorage ("wd-lang"); bawaan Indonesia.
+  // Tahap ini menerjemahkan shell desktop (tombol Start, menu Start,
+  // taskbar, judul jendela, widget jam/kalender, panel notifikasi &
+  // pusat kontrol). Isi dalam aplikasi masih Bahasa Indonesia.
+  var LANGS = ["id", "en"];
+  var lang = "id";
+  try {
+    var savedLang = localStorage.getItem("wd-lang");
+    if (LANGS.indexOf(savedLang) !== -1) lang = savedLang;
+  } catch (e) {}
+  window.LANG = lang;
+  var TITLES = {
+    chat: { id: "Obrolan", en: "Chat" },
+    browser: { id: "Peramban", en: "Browser" },
+    notes: { id: "Catatan", en: "Notes" },
+    calc: { id: "Kalkulator", en: "Calculator" },
+    files: { id: "Files", en: "Files" },
+    settings: { id: "Pengaturan", en: "Settings" },
+    music: { id: "Musik", en: "Music" },
+    terminal: { id: "Terminal", en: "Terminal" },
+    gambar: { id: "Gambar", en: "Drawing" }
+  };
+  var DICT = {
+    start: { id: "Mulai", en: "Start" },
+    search: { id: "Cari aplikasi...", en: "Search apps..." },
+    logout: { id: "Keluar", en: "Log out" },
+    session: { id: "Masuk sebagai ", en: "Signed in as " },
+    noNotifs: { id: "Belum ada notifikasi.", en: "No notifications yet." },
+    testNotif: { id: "Ini notifikasi tes dari pusat kontrol.", en: "This is a test notification from the control center." },
+    welcomeNotif: { id: "Selamat datang di Rutbhics! Ketuk lonceng di taskbar untuk notifikasi & pusat kontrol.", en: "Welcome to Rutbhics! Tap the bell in the taskbar for notifications & control center." },
+    toDark: { id: "🌙 Ganti ke gelap", en: "🌙 Switch to dark" },
+    toLight: { id: "☀️ Ganti ke terang", en: "☀️ Switch to light" },
+    dndOn: { id: "🔕 Jangan ganggu: aktif", en: "🔕 Do not disturb: on" },
+    dndOff: { id: "🔔 Jangan ganggu: nonaktif", en: "🔔 Do not disturb: off" },
+    clearAll: { id: "Hapus semua", en: "Clear all" },
+    notifTitle: { id: "Notifikasi", en: "Notifications" },
+    ccTitle: { id: "Pusat kontrol", en: "Control center" },
+    openSettings: { id: "Buka Pengaturan", en: "Open Settings" },
+    sendTest: { id: "Kirim notifikasi tes", en: "Send test notification" },
+    min: { id: "Minimize", en: "Minimize" },
+    max: { id: "Maximize", en: "Maximize" },
+    restore: { id: "Restore", en: "Restore" },
+    close: { id: "Tutup", en: "Close" },
+    todayBtn: { id: "Hari ini", en: "Today" },
+    pickHint: { id: "Ketuk tanggal untuk memilih.", en: "Tap a date to select it." },
+    picked: { id: "Dipilih: ", en: "Selected: " }
+  };
+  function localeFor() { return lang === "en" ? "en-US" : "id-ID"; }
+  function t(key) { return (DICT[key] && DICT[key][lang]) || key; }
+  function displayTitle(id) {
+    return (TITLES[id] && TITLES[id][lang]) || (APPS[id] && APPS[id].title) || id;
+  }
+
   function appList() {
     return Object.keys(APPS).map(function (id) { return { id: id, def: APPS[id] }; });
   }
@@ -35,7 +89,7 @@
       var b = document.createElement("button");
       b.className = "task-btn";
       b.dataset.app = id;
-      b.textContent = APPS[id].emoji + " " + APPS[id].title;
+      b.textContent = APPS[id].emoji + " " + displayTitle(id);
       b.addEventListener("click", function () {
         var w = openWins[id];
         if (w.classList.contains("hidden-win")) {
@@ -67,10 +121,10 @@
     winCount += 1;
     w.innerHTML =
       '<div class="win-header"><span>' + def.emoji + '</span>' +
-      '<span class="win-title">' + def.title + '</span>' +
-      '<button class="win-btn" data-act="min" title="Minimize">—</button>' +
-      '<button class="win-btn" data-act="max" title="Maximize">⛶</button>' +
-      '<button class="win-btn close" data-act="close" title="Tutup">✕</button></div>' +
+      '<span class="win-title">' + displayTitle(id) + '</span>' +
+      '<button class="win-btn" data-act="min" title="' + t("min") + '">—</button>' +
+      '<button class="win-btn" data-act="max" title="' + t("max") + '">⛶</button>' +
+      '<button class="win-btn close" data-act="close" title="' + t("close") + '">✕</button></div>' +
       '<div class="win-body"></div>';
     var body = w.querySelector(".win-body");
     def.render(body);
@@ -86,7 +140,7 @@
     w.querySelector('[data-act="max"]').addEventListener("click", function () {
       toggleMax(w);
       var btn = w.querySelector('[data-act="max"]');
-      btn.title = w._snapState === "max" ? "Restore" : "Maximize";
+      btn.title = w._snapState === "max" ? t("restore") : t("max");
       btn.textContent = w._snapState === "max" ? "❐" : "⛶";
     });
     w.addEventListener("pointerdown", function () { focusWin(id); });
@@ -205,12 +259,12 @@
       if (q && a.def.title.toLowerCase().indexOf(q) === -1) return;
       var icon = document.createElement("button");
       icon.className = "desk-icon";
-      icon.innerHTML = '<span class="emoji">' + a.def.emoji + '</span><span>' + a.def.title + '</span>';
+      icon.innerHTML = '<span class="emoji">' + a.def.emoji + '</span><span>' + displayTitle(a.id) + '</span>';
       icon.addEventListener("click", function () { openApp(a.id); });
       iconsEl.appendChild(icon);
       var s = document.createElement("button");
       s.className = "start-app";
-      s.innerHTML = '<span class="emoji">' + a.def.emoji + '</span><span>' + a.def.title + '</span>';
+      s.innerHTML = '<span class="emoji">' + a.def.emoji + '</span><span>' + displayTitle(a.id) + '</span>';
       s.addEventListener("click", function () { openApp(a.id); });
       startGrid.appendChild(s);
     });
@@ -229,10 +283,10 @@
   });
 
   // Jam WIB (Asia/Jakarta) — live tiap detik
-  var timeFmt = new Intl.DateTimeFormat("id-ID", {
+  var timeFmt = new Intl.DateTimeFormat(localeFor(), {
     timeZone: "Asia/Jakarta", hour: "2-digit", minute: "2-digit", hour12: false
   });
-  var dateFmt = new Intl.DateTimeFormat("id-ID", {
+  var dateFmt = new Intl.DateTimeFormat(localeFor(), {
     timeZone: "Asia/Jakarta", day: "numeric", month: "short", year: "numeric"
   });
   function tick() {
@@ -253,15 +307,22 @@
   // jam WIB live tiap detik + tanggal + kalender bulan berjalan.
   // Kalender bisa digeser bulan (◀ ▶), "Hari ini" kembali ke bulan
   // berjalan, dan tanggal bisa diketuk untuk dipilih.
-  var widgetTimeFmt = new Intl.DateTimeFormat("id-ID", {
+  var widgetTimeFmt = new Intl.DateTimeFormat(localeFor(), {
     timeZone: "Asia/Jakarta", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false
   });
-  var widgetDateFmt = new Intl.DateTimeFormat("id-ID", {
+  var widgetDateFmt = new Intl.DateTimeFormat(localeFor(), {
     timeZone: "Asia/Jakarta", weekday: "long", day: "numeric", month: "long", year: "numeric"
   });
-  var MONTHS_ID = ["Januari", "Februari", "Maret", "April", "Mei", "Juni",
-    "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
-  var DOW_ID = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
+  var MONTHS = {
+    id: ["Januari", "Februari", "Maret", "April", "Mei", "Juni",
+      "Juli", "Agustus", "September", "Oktober", "November", "Desember"],
+    en: ["January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"]
+  };
+  var DOW = {
+    id: ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"],
+    en: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+  };
   var widgetEl = document.createElement("section");
   widgetEl.id = "desktop-widget";
   var widgetTimeEl = document.createElement("div");
@@ -279,10 +340,10 @@
   var calGrid = document.createElement("div");
   calGrid.className = "cal-grid";
   var calTodayBtn = document.createElement("button");
-  calTodayBtn.className = "cal-nav widget-today"; calTodayBtn.textContent = "Hari ini";
+  calTodayBtn.className = "cal-nav widget-today"; calTodayBtn.textContent = t("todayBtn");
   var calSel = document.createElement("div");
   calSel.className = "widget-sel";
-  calSel.textContent = "Ketuk tanggal untuk memilih.";
+  calSel.textContent = t("pickHint");
   calHead.appendChild(calPrev); calHead.appendChild(calTitle); calHead.appendChild(calNext);
   widgetEl.appendChild(widgetTimeEl); widgetEl.appendChild(widgetDateEl);
   widgetEl.appendChild(calHead); widgetEl.appendChild(calGrid);
@@ -296,10 +357,10 @@
   }
   function renderCalendar() {
     var y = calView.getFullYear(), m = calView.getMonth();
-    calTitle.textContent = MONTHS_ID[m] + " " + y;
+    calTitle.textContent = MONTHS[lang][m] + " " + y;
     calGrid.innerHTML = "";
     var today = new Date();
-    DOW_ID.forEach(function (d) {
+    DOW[lang].forEach(function (d) {
       var h = document.createElement("div");
       h.className = "cal-dow"; h.textContent = d;
       calGrid.appendChild(h);
@@ -321,7 +382,7 @@
         if (calSelected && sameDay(dt, calSelected)) b.classList.add("selected");
         b.addEventListener("click", function () {
           calSelected = dt;
-          calSel.textContent = "Dipilih: " + widgetDateFmt.format(dt);
+          calSel.textContent = t("picked") + widgetDateFmt.format(dt);
           renderCalendar();
         });
         calGrid.appendChild(b);
@@ -347,7 +408,7 @@
     var sessUser = sessionStorage.getItem("wd-session");
     var nameEl = document.getElementById("start-username");
     var logoutBtn = document.getElementById("logout-btn");
-    if (nameEl) nameEl.textContent = sessUser ? "Masuk sebagai " + sessUser : "";
+    if (nameEl) nameEl.textContent = sessUser ? t("session") + sessUser : "";
     if (logoutBtn) logoutBtn.addEventListener("click", function () {
       try { sessionStorage.removeItem("wd-session"); } catch (e) {}
       location.href = "login.html";
@@ -407,7 +468,7 @@
     if (!notifs.length) {
       var empty = document.createElement("p");
       empty.className = "hint";
-      empty.textContent = "Belum ada notifikasi.";
+      empty.textContent = t("noNotifs");
       notifListEl.appendChild(empty);
       return;
     }
@@ -466,7 +527,7 @@
   var ccTheme = document.getElementById("cc-theme");
   function refreshThemeBtn() {
     ccTheme.textContent = document.body.classList.contains("light-theme")
-      ? "🌙 Ganti ke gelap" : "☀️ Ganti ke terang";
+      ? t("toDark") : t("toLight");
   }
   ccTheme.addEventListener("click", function () {
     var light = document.body.classList.toggle("light-theme");
@@ -475,7 +536,7 @@
   });
   var ccDnd = document.getElementById("cc-dnd");
   function refreshDndBtn() {
-    ccDnd.textContent = isDnd() ? "🔕 Jangan ganggu: aktif" : "🔔 Jangan ganggu: nonaktif";
+    ccDnd.textContent = isDnd() ? t("dndOn") : t("dndOff");
   }
   ccDnd.addEventListener("click", function () {
     try { localStorage.setItem("wd-dnd", isDnd() ? "0" : "1"); } catch (e) {}
@@ -486,14 +547,88 @@
     openApp("settings");
   });
   document.getElementById("cc-test").addEventListener("click", function () {
-    pushNotif("Ini notifikasi tes dari pusat kontrol.");
+    pushNotif(t("testNotif"));
   });
   refreshThemeBtn();
   refreshDndBtn();
   drawNotifs();
   if (!notifs.length) {
-    pushNotif("Selamat datang di Rutbhics! Ketuk lonceng di taskbar untuk notifikasi & pusat kontrol.");
+    pushNotif(t("welcomeNotif"));
   }
 
+  // Terapkan bahasa: perbarui semua label shell + widget + jendela
+  // yang sedang terbuka, lalu simpan pilihan. Dipanggil sekali saat
+  // load dan setiap kali bahasa diganti (dari Pengaturan).
+  function applyLang(next) {
+    if (LANGS.indexOf(next) !== -1) lang = next;
+    try { localStorage.setItem("wd-lang", lang); } catch (e) {}
+    window.LANG = lang;
+    try { if (document.documentElement) document.documentElement.lang = lang; } catch (e) {}
+    var startBtn = document.getElementById("start-btn");
+    if (startBtn) {
+      startBtn.title = t("start");
+      var lbl = document.getElementById("start-btn-label");
+      if (lbl) lbl.textContent = t("start");
+    }
+    if (startSearch) startSearch.placeholder = t("search");
+    var logoutBtn = document.getElementById("logout-btn");
+    if (logoutBtn) logoutBtn.textContent = t("logout");
+    var nt = document.getElementById("notif-title");
+    if (nt) nt.textContent = t("notifTitle");
+    var ct = document.getElementById("cc-title");
+    if (ct) ct.textContent = t("ccTitle");
+    var nc = document.getElementById("notif-clear");
+    if (nc) nc.textContent = t("clearAll");
+    var cs = document.getElementById("cc-settings");
+    if (cs) cs.textContent = t("openSettings");
+    var ctest = document.getElementById("cc-test");
+    if (ctest) ctest.textContent = t("sendTest");
+    var nameEl2 = document.getElementById("start-username");
+    if (nameEl2 && typeof sessUser !== "undefined" && sessUser) {
+      nameEl2.textContent = t("session") + sessUser;
+    }
+    // Format tanggal/waktu mengikuti locale bahasa.
+    timeFmt = new Intl.DateTimeFormat(localeFor(), {
+      timeZone: "Asia/Jakarta", hour: "2-digit", minute: "2-digit", hour12: false
+    });
+    dateFmt = new Intl.DateTimeFormat(localeFor(), {
+      timeZone: "Asia/Jakarta", day: "numeric", month: "short", year: "numeric"
+    });
+    widgetTimeFmt = new Intl.DateTimeFormat(localeFor(), {
+      timeZone: "Asia/Jakarta", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false
+    });
+    widgetDateFmt = new Intl.DateTimeFormat(localeFor(), {
+      timeZone: "Asia/Jakarta", weekday: "long", day: "numeric", month: "long", year: "numeric"
+    });
+    tick();
+    if (typeof updateWidgetClock === "function") updateWidgetClock();
+    if (typeof renderCalendar === "function") renderCalendar();
+    if (typeof calSel !== "undefined" && calSel) {
+      calSel.textContent = calSelected ? t("picked") + widgetDateFmt.format(calSelected) : t("pickHint");
+    }
+    if (typeof calTodayBtn !== "undefined" && calTodayBtn) {
+      calTodayBtn.textContent = t("todayBtn");
+    }
+    if (typeof refreshThemeBtn === "function") refreshThemeBtn();
+    if (typeof refreshDndBtn === "function") refreshDndBtn();
+    if (typeof drawNotifs === "function") drawNotifs();
+    renderLaunchers("");
+    renderTaskbar();
+    // Judul + tombol jendela yang sedang terbuka.
+    Object.keys(openWins).forEach(function (id) {
+      var w = openWins[id];
+      var titleEl = w.querySelector(".win-title");
+      if (titleEl) titleEl.textContent = displayTitle(id);
+      ["min", "max", "close"].forEach(function (act) {
+        var b = w.querySelector('[data-act="' + act + '"]');
+        if (!b) return;
+        if (act === "max") b.title = w._snapState === "max" ? t("restore") : t("max");
+        else b.title = t(act);
+      });
+    });
+  }
+  window.setLang = applyLang;
+
+  applyLang(lang);
   renderLaunchers("");
 })();

@@ -33,7 +33,7 @@
 
 <!-- Taskbar -->
 <footer id="taskbar">
-  <button id="start-btn" title="Mulai">⊞ <span>Mulai</span></button>
+  <button id="start-btn" title="Mulai">⊞ <span id="start-btn-label">Mulai</span></button>
   <div id="task-buttons"></div>
   <button id="notif-btn" title="Notifikasi & pusat kontrol">🔔<span id="notif-badge" class="hidden">0</span></button>
   <div id="tray">
@@ -45,12 +45,12 @@
 <!-- Panel notifikasi & pusat kontrol -->
 <div id="notif-panel" class="hidden">
   <div class="notif-panel-head">
-    <strong>Notifikasi</strong>
+    <strong id="notif-title">Notifikasi</strong>
     <button id="notif-clear" class="chip">Hapus semua</button>
   </div>
   <div id="notif-list"></div>
   <div class="notif-panel-head" style="margin-top:14px">
-    <strong>Pusat kontrol</strong>
+    <strong id="cc-title">Pusat kontrol</strong>
   </div>
   <div class="control-row">
     <button id="cc-theme" class="chip">☀️ Ganti ke terang</button>

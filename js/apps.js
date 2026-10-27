@@ -392,6 +392,27 @@
     row.appendChild(darkBtn); row.appendChild(lightBtn);
     body.appendChild(row);
 
+    // Bahasa shell desktop (Indonesia/Inggris, tersimpan lokal).
+    // Diterapkan langsung oleh desktop.js (window.setLang); label
+    // Pengaturan sendiri tidak ikut berubah karena panel ini sudah
+    // dirender — buka lagi panelnya untuk melihat label baru.
+    body.appendChild(el('<p class="settings-head">Bahasa / Language</p>'));
+    var langRow = el('<div class="theme-row"></div>');
+    var curLang = "id";
+    try { curLang = window.LANG || localStorage.getItem("wd-lang") || "id"; } catch (e) {}
+    if (curLang !== "id" && curLang !== "en") curLang = "id";
+    var idBtn = el('<button class="chip theme-btn' + (curLang === "id" ? " active" : "") + '">🇮🇩 Indonesia</button>');
+    var enBtn = el('<button class="chip theme-btn' + (curLang === "en" ? " active" : "") + '">🇬🇧 English</button>');
+    function setLangUI(l) {
+      if (typeof window.setLang === "function") window.setLang(l);
+      idBtn.classList.toggle("active", l === "id");
+      enBtn.classList.toggle("active", l === "en");
+    }
+    idBtn.addEventListener("click", function () { setLangUI("id"); });
+    enBtn.addEventListener("click", function () { setLangUI("en"); });
+    langRow.appendChild(idBtn); langRow.appendChild(enBtn);
+    body.appendChild(langRow);
+
     var reset = el('<button class="btn-primary" style="margin-top:18px">Kembalikan bawaan</button>');
     reset.addEventListener("click", function () {
       try { localStorage.removeItem("wd-wallpaper"); localStorage.removeItem("wd-theme"); } catch (e) {}
