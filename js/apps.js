@@ -9,8 +9,30 @@
       return raw ? JSON.parse(raw) : fallback;
     } catch (e) { return fallback; }
   }
+  // Simpan localStorage: kembalikan true bila berhasil. Bila gagal (kuota
+  // penuh dll), tampilkan banner peringatan yang terlihat pengguna (P2e) —
+  // jangan lagi diam-diam mengklaim "tersimpan".
+  function showStoreWarning() {
+    try {
+      if (document.getElementById("store-warning")) return;
+      var b = document.createElement("div");
+      b.id = "store-warning";
+      b.textContent = "Penyimpanan lokal gagal (kuota penuh?) — perubahan mungkin tidak tersimpan. Ketuk untuk menutup.";
+      b.style.cssText = "position:fixed;left:12px;right:12px;bottom:48px;z-index:9999;background:#7f1d1d;color:#fff;padding:10px 14px;border-radius:10px;font-size:13px;cursor:pointer;";
+      b.addEventListener("click", function () { b.remove(); });
+      document.body.appendChild(b);
+    } catch (e2) {}
+  }
   function save(key, val) {
-    try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { /* abaikan */ }
+    try { localStorage.setItem(key, JSON.stringify(val)); return true; }
+    catch (e) { showStoreWarning(); return false; }
+  }
+  // Batasi riwayat chat: maks 200 pesan per kontak, buang yang terlama (P2e).
+  function trimChatData(data) {
+    Object.keys(data).forEach(function (id) {
+      if (Array.isArray(data[id]) && data[id].length > 200) data[id] = data[id].slice(-200);
+    });
+    return data;
   }
   function el(html) {
     var t = document.createElement("div");
@@ -83,6 +105,7 @@
     notesPlaceholder: { id: "Tulis catatanmu di sini...", en: "Write your notes here..." },
     notesSave: { id: "Simpan", en: "Save" },
     notesSaved: { id: "Tersimpan ✓", en: "Saved ✓" },
+    notesSaveFail: { id: "Gagal menyimpan (penyimpanan lokal penuh?)", en: "Save failed (local storage full?)" },
     filesUp: { id: "↑ Naik", en: "↑ Up" },
     filesNewFolder: { id: "Folder Baru", en: "New Folder" },
     filesNewFile: { id: "Berkas Baru", en: "New File" },
@@ -128,7 +151,8 @@
     gambarDownload: { id: "⬇ Unduh PNG", en: "⬇ Download PNG" },
     gambarAutoSave: { id: "Gambar tersimpan otomatis di perangkat ini.", en: "Drawings save automatically on this device." },
     gambarCleared: { id: "Kanvas dibersihkan dan tersimpan ✓", en: "Canvas cleared and saved ✓" },
-    gambarSaved: { id: "Tersimpan ✓ (otomatis di perangkat ini)", en: "Saved ✓ (automatically on this device)" }
+    gambarSaved: { id: "Tersimpan ✓ (otomatis di perangkat ini)", en: "Saved ✓ (automatically on this device)" },
+    gambarSaveFail: { id: "Gagal menyimpan gambar (penyimpanan lokal penuh?)", en: "Drawing save failed (local storage full?)" }
   };
   function tr(key) {
     var d = TR[key];
@@ -544,6 +568,7 @@
     }
     function pushAI(text) {
       data[active].push({ from: "them", text: text });
+      trimChatData(data);
       save("wd-chat", data);
       drawMsgs();
     }
@@ -579,6 +604,7 @@
       if (!text) return;
       data[active].push({ from: "me", text: text });
       input.value = "";
+      trimChatData(data);
       save("wd-chat", data);
       drawMsgs();
       sendToAI();
@@ -638,8 +664,7 @@
     var btn = el('<button class="btn-primary" style="margin-top:10px">' + tr("notesSave") + '</button>');
     var ok = el('<span class="hint" style="margin-left:10px"></span>');
     btn.addEventListener("click", function () {
-      save("wd-notes", area.value);
-      ok.textContent = tr("notesSaved");
+      ok.textContent = save("wd-notes", area.value) ? tr("notesSaved") : tr("notesSaveFail");
       setTimeout(function () { ok.textContent = ""; }, 2000);
     });
     body.appendChild(area); body.appendChild(btn); body.appendChild(ok);
@@ -1227,8 +1252,7 @@
     clearBtn.addEventListener("click", function () {
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      save("wd-gambar", canvas.toDataURL("image/png"));
-      status.textContent = tr("gambarCleared");
+      status.textContent = save("wd-gambar", canvas.toDataURL("image/png")) ? tr("gambarCleared") : tr("gambarSaveFail");
     });
     var dlBtn = mkBtn(tr("gambarDownload"), "btn-primary");
     dlBtn.addEventListener("click", function () {
@@ -1276,8 +1300,7 @@
     function endStroke() {
       if (!drawing) return;
       drawing = false;
-      save("wd-gambar", canvas.toDataURL("image/png"));
-      status.textContent = tr("gambarSaved");
+      status.textContent = save("wd-gambar", canvas.toDataURL("image/png")) ? tr("gambarSaved") : tr("gambarSaveFail");
     }
     canvas.addEventListener("pointerup", endStroke);
     canvas.addEventListener("pointercancel", endStroke);
