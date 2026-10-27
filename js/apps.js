@@ -172,8 +172,8 @@
   ];
   // Persona AI per kontak Obrolan (dikirim sebagai system prompt ke /api/chat).
   // Catatan jujur: Teman & Grup Keluarga tetap BUKAN orang sungguhan — mereka
-  // adalah persona AI. Chat antar pengguna beneran butuh backend server
-  // (tahap berikutnya, belum dikerjakan).
+  // adalah persona AI. Chat antar pengguna sungguhan tersedia lewat ruang
+  // multi-user (perlu server); persona di sini tidak berubah karenanya.
   var PERSONAS = {
     id: {
       teman: "Kamu adalah Teman, teman akrab pengguna di aplikasi chat Rutbhics. Jawab santai seperti teman mengobrol, singkat, dan dalam Bahasa Indonesia.",

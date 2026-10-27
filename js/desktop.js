@@ -17,9 +17,10 @@
 
   // ---------- Mode multi-bahasa (Indonesia/Inggris) ----------
   // Bahasa tersimpan di localStorage ("wd-lang"); bawaan Indonesia.
-  // Tahap ini menerjemahkan shell desktop (tombol Start, menu Start,
-  // taskbar, judul jendela, widget jam/kalender, panel notifikasi &
-  // pusat kontrol). Isi dalam aplikasi masih Bahasa Indonesia.
+  // Shell desktop (tombol Start, menu Start, taskbar, judul jendela,
+  // widget jam/kalender, panel notifikasi & pusat kontrol) dan isi
+  // aplikasi mengikuti bahasa yang sama; terjemahan isi aplikasi ada
+  // di kamus TR js/apps.js.
   var LANGS = ["id", "en"];
   var lang = "id";
   try {

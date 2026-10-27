@@ -456,8 +456,9 @@ function readBody(req, limit) {
   });
 }
 
-// ---------- Proxy Bot AI -> Larprouter ----------
 // ---------- Proxy Bot AI -> multi-provider (config.json) ----------
+// Provider bawaan Larprouter termasuk dalam daftar provider; klien
+// memilih model lewat "provider:model" atau model bawaan server.
 function handleChat(req, res) {
   // Hanya dari perangkat ini: kunci dibayar pemiliknya, jangan sampai
   // dipakai perangkat lain yang se-jaringan.
@@ -602,7 +603,8 @@ async function handleModels(req, res) {
 // saat server di-restart, tidak hilang saat package di-update). Batas:
 // 20 ruang, 500 pesan terakhir per ruang, nama 30 karakter, teks 2000.
 // Sengaja tanpa gate loopback (berbeda dengan /api/chat): perangkat lain
-// di jaringan harus bisa membaca/mengirim. Tahap 1 tanpa akun server.
+// di jaringan harus bisa membaca/mengirim. Membaca ruang/pesan terbuka;
+// membuat ruang dan mengirim pesan wajib login (akun server).
 const CHAT_FILE = path.join(process.cwd(), "rutbhics-chat.json");
 // ---------- Persistensi atomik + backup (P1-3) ----------
 // Tulis lewat berkas temp + rename agar crash di tengah tulis tidak
