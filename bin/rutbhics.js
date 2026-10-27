@@ -265,6 +265,11 @@ function mergeRoles(msgs) {
   return out;
 }
 // Permintaan JSON generik (http/https sesuai protokol) -> { status, data }.
+// Timeout default 60 dtk (atau opts.timeoutMs); cap byte respons default
+// 2MB (A2-06) — tanpa cap, provider dapat mengalirkan bodi raksasa ke
+// memori server single-thread -> OOM. Cukup untuk jawaban AI
+// (max_tokens 1024) + daftar model; pemanggil dapat mengesampingkan
+// lewat opts.maxBytes.
 function httpJson(opts) {
   return new Promise((resolve, reject) => {
     const target = new URL(opts.url);
@@ -278,8 +283,21 @@ function httpJson(opts) {
       headers: opts.headers || {},
       timeout: opts.timeoutMs || 60000
     }, (res) => {
+      const maxBytes = opts.maxBytes || 2 * 1024 * 1024;
       const chunks = [];
-      res.on("data", (c) => chunks.push(c));
+      let total = 0;
+      res.on("data", (c) => {
+        total += c.length;
+        if (total > maxBytes) {
+          // Hanya destroy request: destroy response DULU menelan error
+          // destroy request berikutnya (stream sudah hancur tanpa error),
+          // sehingga promise tidak pernah settle (hang) — dibuktikan repro.
+          // Destroy request menutup soket + respons sekaligus.
+          r.destroy(new Error("respons terlalu besar"));
+          return;
+        }
+        chunks.push(c);
+      });
       res.on("end", () => {
         let data = null;
         try { data = JSON.parse(Buffer.concat(chunks).toString("utf8")); } catch (e) { /* abaikan */ }
@@ -1208,12 +1226,30 @@ function httpsPostForm(urlStr, params, extraHeaders) {
   return new Promise((resolve, reject) => {
     const u = new URL(urlStr);
     const body = new URLSearchParams(params).toString();
+    // Timeout + cap byte OAuth (A2-06): tanpa timeout, callback yang
+    // menggantung mengendapkan request+soket tanpa batas waktu; tanpa
+    // cap, bodi raksasa membanjiri memori. Port diteruskan eksplisit
+    // (sebelumnya diabaikan — konsisten dengan httpJson); untuk URL
+    // provider asli tanpa port eksplisit, nilainya tetap 443.
     const r = https.request({
-      method: "POST", hostname: u.hostname, path: u.pathname + u.search,
-      headers: Object.assign({ "Content-Type": "application/x-www-form-urlencoded", "Content-Length": Buffer.byteLength(body) }, extraHeaders || {})
+      method: "POST", hostname: u.hostname, port: u.port ? Number(u.port) : 443, path: u.pathname + u.search,
+      headers: Object.assign({ "Content-Type": "application/x-www-form-urlencoded", "Content-Length": Buffer.byteLength(body) }, extraHeaders || {}),
+      timeout: 15000
     }, (res) => {
       const chunks = [];
-      res.on("data", (c) => chunks.push(c));
+      let total = 0;
+      res.on("data", (c) => {
+        total += c.length;
+        if (total > 256 * 1024) {
+          // Hanya destroy request: destroy response DULU menelan error
+          // destroy request berikutnya (stream sudah hancur tanpa error),
+          // sehingga promise tidak pernah settle (hang) — dibuktikan repro.
+          // Destroy request menutup soket + respons sekaligus.
+          r.destroy(new Error("respons terlalu besar"));
+          return;
+        }
+        chunks.push(c);
+      });
       res.on("end", () => {
         try {
           const j = JSON.parse(Buffer.concat(chunks).toString("utf8"));
@@ -1222,6 +1258,7 @@ function httpsPostForm(urlStr, params, extraHeaders) {
         } catch (e) { reject(e); }
       });
     });
+    r.on("timeout", () => { r.destroy(new Error("timeout")); });
     r.on("error", reject);
     r.write(body);
     r.end();
@@ -1231,11 +1268,24 @@ function httpsGetJson(urlStr, extraHeaders) {
   return new Promise((resolve, reject) => {
     const u = new URL(urlStr);
     const r = https.request({
-      method: "GET", hostname: u.hostname, path: u.pathname + u.search,
-      headers: Object.assign({ "User-Agent": "Rutbhics" }, extraHeaders || {})
+      method: "GET", hostname: u.hostname, port: u.port ? Number(u.port) : 443, path: u.pathname + u.search,
+      headers: Object.assign({ "User-Agent": "Rutbhics" }, extraHeaders || {}),
+      timeout: 15000
     }, (res) => {
       const chunks = [];
-      res.on("data", (c) => chunks.push(c));
+      let total = 0;
+      res.on("data", (c) => {
+        total += c.length;
+        if (total > 256 * 1024) {
+          // Hanya destroy request: destroy response DULU menelan error
+          // destroy request berikutnya (stream sudah hancur tanpa error),
+          // sehingga promise tidak pernah settle (hang) — dibuktikan repro.
+          // Destroy request menutup soket + respons sekaligus.
+          r.destroy(new Error("respons terlalu besar"));
+          return;
+        }
+        chunks.push(c);
+      });
       res.on("end", () => {
         try {
           const j = JSON.parse(Buffer.concat(chunks).toString("utf8"));
@@ -1244,6 +1294,7 @@ function httpsGetJson(urlStr, extraHeaders) {
         } catch (e) { reject(e); }
       });
     });
+    r.on("timeout", () => { r.destroy(new Error("timeout")); });
     r.on("error", reject);
     r.end();
   });

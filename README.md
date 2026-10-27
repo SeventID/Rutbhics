@@ -337,6 +337,13 @@ Perilaku:
 >   (sekali pakai dipertahankan). Initiate kedua menimpa cookie sehingga
 >   state pertama menjadi tidak dapat dipakai — selesaikan alur terbaru.
 >
+> **Batas upstream (A2-06):** panggilan OAuth dibatasi timeout 15 detik
+>   dan respons 256KB; respons AI dibatasi 2MB (timeout AI tetap 60
+>   detik). Pelanggaran batas gagal lewat jalur yang sudah ada (OAuth
+>   -> halaman gagal login; AI -> 502 `provider_gagal`), bukan hang
+>   atau OOM. Provider lambat yang sah tidak terpengaruh selama di
+>   bawah batas ini.
+>
 > **PERINGATAN TEGAS:** `AI_ACCESS=local` yang disetel eksplisit TETAP
 > BERBAHAYA bila server diekspos lewat reverse proxy/domain publik —
 > kunci AI menjadi terbuka; operator yang mengekspos server WAJIB memakai
