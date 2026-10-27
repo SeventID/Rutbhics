@@ -275,6 +275,34 @@ Perilaku:
 
 ## 🚀 Deployment (VPS)
 
+> ⚠️ **PERINGATAN KEAMANAN (P0-N1, sebelum S1):** panduan proxy di bawah
+> ini menggugurkan gate AI loopback. Selama server diekspos lewat reverse
+> proxy, **jangan mengekspos `/api/chat` ke internet** sebelum perbaikan
+> S1 mendarat: skrip tanpa Origin (curl/bot) lolos tanpa login dan dapat
+> memakai kunci AI-mu, sementara browser jarak jauh yang sah justru
+> ditolak (403). Untuk VPS publik, sementara batasi lewat firewall
+> (hanya IP operator) atau jangan aktifkan kunci AI.
+>
+> **Aturan mode S1 (yang akan mendarat) — prioritas konfigurasi
+> eksplisit:** `AI_ACCESS=local` atau `AI_ACCESS=login` yang disetel
+> operator = pilihan utama, mengalahkan segalanya. Bila tidak disetel:
+> host loopback → `local`; host non-loopback → `login`. Log startup
+> menampilkan mode efektif.
+>
+> **PERINGATAN TEGAS:** `AI_ACCESS=local` yang disetel eksplisit TETAP
+> BERBAHAYA bila server diekspos lewat reverse proxy/domain publik —
+> kunci AI menjadi terbuka; operator yang mengekspos server WAJIB memakai
+> mode `login`. Mode `local` hanya untuk pemakaian perangkat sendiri
+> TANPA proxy — tidak boleh diletakkan di balik proxy atau diekspos,
+> tanpa pengecualian.
+>
+> **Tanda proxy hanya INDIKATOR, bukan bukti:** header `X-Forwarded-For` /
+> `X-Real-IP` dapat dipalsukan bila server menerima koneksi langsung dari
+> klien, dan Host/Origin non-loopback pun dapat dikirim siapa saja. Maka
+> tanda-tanda ini (yang dicatat S1 di log sebagai peringatan) hanya
+> indikator — bukan deteksi proxy yang sempurna — dan TIDAK PERNAH dipakai
+> sebagai dasar memberi akses. Akses hanya ditentukan mode + sesi.
+
 Jalankan server di loopback, lalu ekspos lewat reverse proxy + HTTPS.
 Jangan membuka port aplikasi langsung ke internet.
 
