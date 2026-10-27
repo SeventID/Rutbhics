@@ -362,17 +362,34 @@ async function fetchOpenAiModels(provider) {
 }
 
 function parsePort(argv) {
-  // Prioritas: --port > PORT > config.port > 8080 (yang tidak valid dilewati).
+  // Prioritas: --port > PORT > config.port > 8080. Nilai harus numerik
+  // penuh ("8080abc" ditolak, bukan dipotong jadi 8080); yang tidak
+  // valid dilewati dengan peringatan (seperti --host).
   const valid = (n) => Number.isInteger(n) && n >= 1 && n <= 65535;
+  const strictNum = (v) => {
+    if (typeof v === "number") return valid(v) ? v : null;
+    if (typeof v !== "string") return null;
+    const s = v.trim();
+    if (!/^\d+$/.test(s)) return null;
+    const n = Number(s);
+    return valid(n) ? n : null;
+  };
   const i = argv.indexOf("--port");
-  if (i !== -1 && argv[i + 1]) {
-    const p = parseInt(argv[i + 1], 10);
-    if (valid(p)) return p;
+  if (i !== -1 && argv[i + 1] !== undefined) {
+    const p = strictNum(argv[i + 1]);
+    if (p !== null) return p;
+    console.error('[rutbhics] --port tidak valid ("' + argv[i + 1] + '"), dilewati.');
   }
-  const e = parseInt(process.env.PORT, 10);
-  if (valid(e)) return e;
-  const c = parseInt(USER_CONFIG.port, 10);
-  if (valid(c)) return c;
+  if (process.env.PORT !== undefined) {
+    const p = strictNum(process.env.PORT);
+    if (p !== null) return p;
+    console.error('[rutbhics] PORT tidak valid ("' + process.env.PORT + '"), dilewati.');
+  }
+  if (USER_CONFIG.port !== undefined) {
+    const p = strictNum(USER_CONFIG.port);
+    if (p !== null) return p;
+    console.error("[rutbhics] config.port tidak valid, dilewati.");
+  }
   return 8080;
 }
 
