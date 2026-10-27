@@ -182,6 +182,7 @@ input, textarea { font: inherit; color: var(--ink); }
   background: transparent; color: var(--ink); font-size: 12px;
 }
 .chip:hover { background: rgba(255, 255, 255, .1); }
+.hidden { display: none; }
 .hint { color: var(--muted); font-size: 12px; margin-top: 8px; line-height: 1.5; }
 
 /* Aplikasi: Catatan & Kalkulator */

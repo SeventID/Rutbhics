@@ -66,7 +66,14 @@ Rutbhics bisa dijalankan sebagai server web statis (mis. `python3 -m http.server
 Nginx, atau hosting statis apa pun) — tidak butuh backend.
 
 - Buka halaman utama: pengunjung diarahkan ke `login.html`.
-- Kunjungan pertama: buat akun perangkat (nama pengguna + kata sandi).
+- Bila halaman dilayani server `rutbhics` (bukan hosting statis),
+  `login.html` menampilkan login/daftar AKUN SERVER (username/email/HP +
+  kata sandi, atau Google/GitHub bila dikonfigurasi) — dan begitu masuk,
+  chat multi-user langsung mengenalimu tanpa login lagi (cukup login
+  sekali di halaman pertama). Di hosting statis tanpa server, tetap
+  berlaku akun lokal perangkat seperti di bawah; tautan "Pakai akun lokal
+  perangkat" selalu tersedia di form server.
+- Kunjungan pertama (akun lokal): buat akun perangkat (nama pengguna + kata sandi).
   Akun tersimpan lokal di perangkat itu (kata sandi di-hash SHA-256 bila
   konteks aman, fallback hash sederhana bila tidak).
 - Setelah masuk, desktop terkunci di balik sesi tab itu; keluar lewat
@@ -91,7 +98,7 @@ Nginx, atau hosting statis apa pun) — tidak butuh backend.
 
 ```
 index.html        — shell: wallpaper, ikon desktop, taskbar, menu Start, panel notifikasi & pusat kontrol, widget jam/kalender
-login.html        — halaman login (akun lokal perangkat) + kunci desktop
+login.html        — halaman login (login server bila dilayani rutbhics, fallback akun lokal) + kunci desktop
 css/style.css     — seluruh tampilan desktop & aplikasi
 js/desktop.js     — window manager (drag, minimize, focus, taskbar, jam WIB, terapkan pengaturan tersimpan, notifikasi & pusat kontrol, maximize & snap)
 js/apps.js        — aplikasi bawaan (obrolan, peramban, catatan, kalkulator, files, pengaturan, musik, terminal, gambar)
@@ -118,12 +125,13 @@ Cara mengaktifkan:
 
 Catatan:
 
-- Multi-model: daftar model diambil live dari Larprouter lewat
-  `GET /api/models` (daftar cadangan bila gagal); di Obrolan ada dropdown
-  model di atas kolom tulis — pilihan tersimpan di perangkat (`wd-model`)
-  dan dikirim sebagai field `model` di `POST /api/chat`. Model bawaan server
-  tetap `deepseek-v4.1-flash` (bisa diubah lewat `LARPROUTER_MODEL` di `.env`;
-  model utama `claude-opus-4-7-1m` bisa dipilih begitu kreditnya cukup).
+- Model AI: tidak dipilih di web — server memakai model bawaan
+  `deepseek-v4.1-flash` (bisa diubah lewat `LARPROUTER_MODEL` di `.env`,
+  atau `defaultModel` di `config.json`; model utama `claude-opus-4-7-1m`
+  bisa dipakai begitu kreditnya cukup). Daftar model server tersedia lewat
+  `GET /api/models` (loopback-only), tapi tidak lagi ditampilkan sebagai
+  dropdown di Obrolan; pilihan model lama yang tersimpan di perangkat
+  (`wd-model`) dibersihkan otomatis saat Obrolan dibuka.
 - Multi-bahasa chat: dropdown "Bahasa balasan" di Obrolan — bisa "Ikuti
   bahasa UI" atau dipilih sendiri (Indonesia, Inggris, Jepang, Korea,
   Mandarin, Arab, Spanyol, Prancis, Jerman, Portugis); persona AI
@@ -147,8 +155,10 @@ Cara memakai:
 
 1. Jalankan `rutbhics` di satu perangkat (ini servernya).
 2. Dari perangkat lain di jaringan yang sama, buka `http://<IP-perangkat-server>:8080`.
-3. Buka Obrolan → "👥 Multi-User", masuk/daftar, pilih/buat ruang, kirim pesan.
-   Pesan baru diambil tiap 3 detik.
+3. Buka Obrolan → "👥 Multi-User" — bila sudah login di halaman pertama,
+   pane langsung mengenalimu tanpa login lagi; bila belum (mis. sesi habis
+   atau masuk lewat akun lokal), masuk/daftar di pane ini — lalu pilih/buat
+   ruang, kirim pesan. Pesan baru diambil tiap 3 detik.
 
 Catatan jujur (tahap 1):
 
@@ -165,9 +175,11 @@ Catatan jujur (tahap 1):
 
 Membaca ruang dan pesan tetap terbuka, tapi membuat ruang dan mengirim
 pesan wajib login — nama pengirim selalu username terverifikasi dari
-akun server, bukan lagi klaim bebas. Login desktop (halaman login)
-tetap akun lokal per perangkat dan tidak berubah; akun server ini
-khusus untuk chat multi-user, diatur di dalam pane "👥 Multi-User".
+akun server, bukan lagi klaim bebas. Pintu loginnya adalah halaman pertama
+(`login.html`) bila dilayani server `rutbhics`; form masuk/daftar di dalam
+pane "👥 Multi-User" tetap ada sebagai cadangan (mis. sesi kedaluwarsa
+atau masuk lewat akun lokal). Di hosting statis tanpa server, login
+desktop tetap akun lokal per perangkat.
 
 Metode yang tersedia:
 
@@ -213,8 +225,9 @@ Cara memakai:
    jadi tidak ikut commit — polanya sama seperti `.env`).
 2. Isi kunci API-nya di `.env` (bukan di `config.json`!), sesuai nama
    variabel di field `apiKeyEnv` tiap provider (mis. `ANTHROPIC_API_KEY`).
-3. Jalankan ulang `rutbhics`, buka Obrolan — dropdown model kini
-   berisi `provider:model` (mis. `anthropic:claude-sonnet-4-5`).
+3. Jalankan ulang `rutbhics`, buka Obrolan — chat memakai model bawaan
+   server (`LARPROUTER_MODEL` / `defaultModel` provider; format
+   `provider:model` di sisi server, mis. `anthropic:claude-sonnet-4-5`).
 
 Skema `config.json`:
 

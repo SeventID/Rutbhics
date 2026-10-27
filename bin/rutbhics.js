@@ -910,13 +910,13 @@ function handleAuth(req, res) {
   sendJson(res, 404, { error: "tidak_ditemukan" });
 }
 
-// Perintah setup mandiri: tanya kunci Larprouter, simpan ke .env folder
-// kerja (lokasi permanen yang tidak hilang saat package di-update), lalu
-// berhenti — server tidak dijalankan.
+// Perintah setup mandiri: tanya kunci Larprouter (dan model bawaan),
+// simpan ke .env folder kerja (lokasi permanen yang tidak hilang saat
+// package di-update), lalu berhenti — server tidak dijalankan.
 if (process.argv.includes("--setup")) {
   try {
     const setup = require(path.join(__dirname, "..", "scripts", "setup-larprouter.js"));
-    setup.runSetup(path.join(process.cwd(), ".env"));
+    setup.runSetup(path.join(process.cwd(), ".env"), { askModel: true });
   } catch (e) { /* setup tidak pernah menggagalkan perintah */ }
   process.exit(0);
 }

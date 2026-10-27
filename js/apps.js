@@ -31,7 +31,6 @@
   }
   var TR = {
     chatPlaceholder: { id: "Tulis pesan...", en: "Write a message..." },
-    chatModel: { id: "Model AI:", en: "AI model:" },
     chatReplyLang: { id: "Bahasa balasan:", en: "Reply language:" },
     chatLangAuto: { id: "Ikuti bahasa UI", en: "Follow UI language" },
     chatMultiRoom: { id: "Ruang:", en: "Room:" },
@@ -159,6 +158,9 @@
     var data = store("wd-chat", {});
     CONTACTS.forEach(function (c) { if (!data[c.id]) data[c.id] = [{ from: "them", text: c.hello[langNow()] }]; });
     var active = CONTACTS[0].id;
+    // Model tidak lagi dipilih di web (dipilih di .env / waktu setup):
+    // bersihkan pilihan lama bila masih tersimpan di perangkat ini.
+    try { localStorage.removeItem("wd-model"); } catch (e) {}
     var wrap = el('<div class="chat-wrap"></div>');
     var listEl = el('<div class="chat-contacts"></div>');
     var mainEl = el('<div class="chat-main"></div>');
@@ -172,47 +174,6 @@
     // /api/chat di server lokal, kunci dibaca server dari .env.
     var botHint = tr("chatHintOff");
     var hintEl = el('<p class="hint bot-hint"></p>');
-    // Pilih model AI (multi-model): daftar live dari server (/api/models),
-    // cadangan bila gagal; pilihan tersimpan lokal (wd-model) dan dikirim
-    // sebagai field "model" di tiap POST /api/chat.
-    var FALLBACK_MODELS = ["deepseek-v4.1-flash", "claude-opus-4-7-1m", "deepseek-v4.1-flash-1017-abliterated", "deepseek-v4.1-flash-fast", "glm-5.3", "glm-5.3-flash"];
-    var modelOptions = FALLBACK_MODELS.slice();
-    var serverDefaultModel = null;
-    var modelRow = el('<div class="chat-model-row"></div>');
-    var modelLabel = el('<span class="hint" style="margin:0"></span>');
-    modelLabel.textContent = tr("chatModel");
-    var modelSelect = document.createElement("select");
-    modelSelect.className = "chat-model";
-    modelRow.appendChild(modelLabel); modelRow.appendChild(modelSelect);
-    function drawModelSelect() {
-      modelSelect.innerHTML = "";
-      modelOptions.forEach(function (m) {
-        var o = document.createElement("option");
-        o.value = m; o.textContent = m;
-        modelSelect.appendChild(o);
-      });
-      var want = null;
-      try { want = localStorage.getItem("wd-model"); } catch (e) {}
-      if (!want || modelOptions.indexOf(want) === -1) {
-        want = (serverDefaultModel && modelOptions.indexOf(serverDefaultModel) !== -1)
-          ? serverDefaultModel : modelOptions[0];
-      }
-      modelSelect.value = want;
-    }
-    modelSelect.addEventListener("change", function () {
-      try { localStorage.setItem("wd-model", modelSelect.value); } catch (e) {}
-    });
-    drawModelSelect();
-    try {
-      if (typeof fetch === "function") {
-        fetch("/api/models").then(function (r) { return r.json(); }).then(function (j) {
-          if (j && Array.isArray(j.models) && j.models.length) {
-            modelOptions = j.models;
-            drawModelSelect();
-          }
-        }).catch(function () { /* tetap pakai daftar cadangan */ });
-      }
-    } catch (e) { /* abaikan */ }
     // Bahasa balasan AI (multi-bahasa chat): bisa dipilih sendiri, tidak
     // harus sama dengan bahasa UI. "auto" = ikuti bahasa UI. Untuk
     // Indonesia/Inggris dipakai persona lengkap yang sudah ada; untuk
@@ -485,7 +446,6 @@
     function showPane() {
       var multi = active === "__multi__";
       msgsEl.style.display = multi ? "none" : "";
-      modelRow.style.display = multi ? "none" : "";
       langRow.style.display = multi ? "none" : "";
       inputRow.style.display = multi ? "none" : "";
       hintEl.style.display = multi ? "none" : "";
@@ -539,7 +499,7 @@
       }).catch(function () { multiHint.textContent = tr("chatMultiOffline"); });
     });
     newRoomInput.addEventListener("keydown", function (e) { if (e.key === "Enter") createBtn.click(); });
-    mainEl.appendChild(msgsEl); mainEl.appendChild(modelRow); mainEl.appendChild(langRow); mainEl.appendChild(inputRow); mainEl.appendChild(hintEl); mainEl.appendChild(multiEl);
+    mainEl.appendChild(msgsEl); mainEl.appendChild(langRow); mainEl.appendChild(inputRow); mainEl.appendChild(hintEl); mainEl.appendChild(multiEl);
     wrap.appendChild(listEl); wrap.appendChild(mainEl);
     body.appendChild(wrap);
 
@@ -584,7 +544,7 @@
       fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: history, system: personaFor(active), model: modelSelect.value })
+        body: JSON.stringify({ messages: history, system: personaFor(active) })
       }).then(function (r) {
         return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; });
       }).then(function (res) {
@@ -616,7 +576,6 @@
     try {
       if (typeof fetch === "function") {
         fetch("/api/chat").then(function (r) { return r.json(); }).then(function (s) {
-          if (s && s.model) { serverDefaultModel = s.model; drawModelSelect(); }
           if (s && s.active) botHint = tr("chatHintOn").replace("{model}", s.model);
           else botHint = tr("chatHintSetup");
           drawMsgs();

@@ -12,16 +12,50 @@
   <section class="login-card">
     <h1>🖥️ Rutbhics</h1>
     <p class="sub" id="login-sub">Masuk ke desktop.</p>
-    <form id="login-form">
-      <label for="username" id="label-user">Nama pengguna</label>
-      <input id="username" type="text" autocomplete="username" required>
-      <label for="password" id="label-pass">Kata sandi</label>
-      <input id="password" type="password" autocomplete="current-password" required>
-      <p id="login-error" class="login-error"></p>
-      <button id="login-btn" class="btn-primary" type="submit">Masuk</button>
-    </form>
-    <button id="reset-account" class="login-link hidden">Ganti akun perangkat (hapus akun ini)</button>
-    <p class="hint" id="login-hint">Akun tersimpan lokal di perangkat ini (demo). Ini bukan autentikasi server sungguhan — siapa pun yang memegang berkasnya bisa melewatinya. Untuk autentikasi multi-pengguna sungguhan, perlu backend di tahap berikutnya.</p>
+    <div id="local-auth">
+      <form id="login-form">
+        <label for="username" id="label-user">Nama pengguna</label>
+        <input id="username" type="text" autocomplete="username" required>
+        <label for="password" id="label-pass">Kata sandi</label>
+        <input id="password" type="password" autocomplete="current-password" required>
+        <p id="login-error" class="login-error"></p>
+        <button id="login-btn" class="btn-primary" type="submit">Masuk</button>
+      </form>
+      <button id="reset-account" class="login-link hidden">Ganti akun perangkat (hapus akun ini)</button>
+      <p class="hint" id="login-hint">Akun tersimpan lokal di perangkat ini (demo). Ini bukan autentikasi server sungguhan — siapa pun yang memegang berkasnya bisa melewatinya. Untuk autentikasi multi-pengguna sungguhan, perlu backend di tahap berikutnya.</p>
+    </div>
+    <div id="server-auth" class="hidden">
+      <div style="display:flex;gap:8px;margin-bottom:6px">
+        <button id="srv-login-tab" class="chip active" type="button">Masuk</button>
+        <button id="srv-register-tab" class="chip" type="button">Daftar</button>
+      </div>
+      <form id="srv-form">
+        <div id="srv-login-fields">
+          <label for="srv-identifier" id="srv-label-identifier">Username, email, atau HP</label>
+          <input id="srv-identifier" type="text" autocomplete="username">
+          <label for="srv-login-pass" id="srv-label-login-pass">Kata sandi</label>
+          <input id="srv-login-pass" type="password" autocomplete="current-password">
+        </div>
+        <div id="srv-register-fields" class="hidden">
+          <label for="srv-username" id="srv-label-username">Username (3-30 karakter)</label>
+          <input id="srv-username" type="text" autocomplete="username">
+          <label for="srv-email" id="srv-label-email">Email (opsional)</label>
+          <input id="srv-email" type="email" autocomplete="email">
+          <label for="srv-phone" id="srv-label-phone">HP (opsional)</label>
+          <input id="srv-phone" type="tel" autocomplete="tel">
+          <label for="srv-register-pass" id="srv-label-register-pass">Kata sandi (min. 8 karakter)</label>
+          <input id="srv-register-pass" type="password" autocomplete="new-password">
+        </div>
+        <p id="srv-error" class="login-error"></p>
+        <button id="srv-submit" class="btn-primary" type="submit">Masuk</button>
+      </form>
+      <div id="srv-oauth-row" class="hidden" style="gap:8px;margin-top:14px">
+        <a id="srv-oauth-google" class="chip" href="/api/auth/google">Login dengan Google</a>
+        <a id="srv-oauth-github" class="chip" href="/api/auth/github">Login dengan GitHub</a>
+      </div>
+      <p class="hint" id="srv-hint">Akun server Rutbhics — dipakai juga oleh chat multi-user, jadi cukup login sekali di sini.</p>
+      <button id="srv-local-link" class="login-link" type="button">Pakai akun lokal perangkat</button>
+    </div>
   </section>
 </main>
 <script>
@@ -35,6 +69,9 @@
   var errEl = document.getElementById("login-error");
   var btn = document.getElementById("login-btn");
   var resetBtn = document.getElementById("reset-account");
+  var subEl = document.getElementById("login-sub");
+  var localAuth = document.getElementById("local-auth");
+  var serverAuth = document.getElementById("server-auth");
 
   // Bahasa halaman login mengikuti pilihan di desktop (localStorage
   // "wd-lang"); halaman ini tidak memuat desktop.js jadi kamusnya
@@ -54,17 +91,48 @@
     hint: { id: "Akun tersimpan lokal di perangkat ini (demo). Ini bukan autentikasi server sungguhan — siapa pun yang memegang berkasnya bisa melewatinya. Untuk autentikasi multi-pengguna sungguhan, perlu backend di tahap berikutnya.", en: "Accounts are stored locally on this device (demo). This is not real server authentication — anyone holding the files can bypass it. Real multi-user authentication needs a backend in a later stage." },
     fillBoth: { id: "Isi nama pengguna dan kata sandi.", en: "Fill in username and password." },
     saveFail: { id: "Gagal menyimpan akun di perangkat ini.", en: "Failed to save the account on this device." },
-    wrongCred: { id: "Nama pengguna atau kata sandi salah.", en: "Wrong username or password." }
+    wrongCred: { id: "Nama pengguna atau kata sandi salah.", en: "Wrong username or password." },
+    srvSub: { id: "Masuk dengan akun server.", en: "Sign in with your server account." },
+    srvLogin: { id: "Masuk", en: "Log in" },
+    srvRegister: { id: "Daftar", en: "Register" },
+    srvIdentifier: { id: "Username, email, atau HP", en: "Username, email, or phone" },
+    srvUsername: { id: "Username (3-30 karakter)", en: "Username (3-30 characters)" },
+    srvEmail: { id: "Email (opsional)", en: "Email (optional)" },
+    srvPhone: { id: "HP (opsional)", en: "Phone (optional)" },
+    srvPass: { id: "Kata sandi (min. 8 karakter)", en: "Password (min. 8 characters)" },
+    srvHint: { id: "Akun server Rutbhics — dipakai juga oleh chat multi-user, jadi cukup login sekali di sini.", en: "Your Rutbhics server account — also used by multi-user chat, so one login here is enough." },
+    srvLocal: { id: "Pakai akun lokal perangkat", en: "Use the local device account" },
+    srvErrInvalid: { id: "Data tidak valid. Periksa username, email, atau HP.", en: "Invalid data. Check the username, email, or phone." },
+    srvErrShort: { id: "Kata sandi minimal 8 karakter.", en: "Password must be at least 8 characters." },
+    srvErrUserTaken: { id: "Username sudah dipakai.", en: "Username is already taken." },
+    srvErrEmailTaken: { id: "Email sudah dipakai akun lain.", en: "Email is already used by another account." },
+    srvErrPhoneTaken: { id: "Nomor HP sudah dipakai akun lain.", en: "Phone number is already used by another account." },
+    srvErrWrong: { id: "Akun tidak ditemukan atau kata sandi salah.", en: "Account not found or wrong password." },
+    srvErrTooMany: { id: "Terlalu banyak percobaan. Coba lagi 10 menit lagi.", en: "Too many attempts. Try again in 10 minutes." },
+    srvErrOauth: { id: "Login ini belum dikonfigurasi di server.", en: "This login is not configured on the server." },
+    srvErrGeneric: { id: "Terjadi kesalahan. Coba lagi.", en: "Something went wrong. Try again." },
+    srvErrOffline: { id: "Server tidak terjangkau. Coba lagi atau pakai akun lokal perangkat.", en: "Server is unreachable. Try again or use the local device account." }
   };
   function lt(key) { return (T[key] && T[key][lang]) || key; }
   document.documentElement.lang = lang;
   document.title = lt("title");
-  document.getElementById("login-sub").textContent = lt("sub");
+  subEl.textContent = lt("sub");
   document.getElementById("label-user").textContent = lt("user");
   document.getElementById("label-pass").textContent = lt("pass");
   document.getElementById("login-hint").textContent = lt("hint");
   btn.textContent = lt("signin");
   resetBtn.textContent = lt("reset");
+  // Teks seksi server.
+  document.getElementById("srv-login-tab").textContent = lt("srvLogin");
+  document.getElementById("srv-register-tab").textContent = lt("srvRegister");
+  document.getElementById("srv-label-identifier").textContent = lt("srvIdentifier");
+  document.getElementById("srv-label-login-pass").textContent = lt("srvPass");
+  document.getElementById("srv-label-username").textContent = lt("srvUsername");
+  document.getElementById("srv-label-email").textContent = lt("srvEmail");
+  document.getElementById("srv-label-phone").textContent = lt("srvPhone");
+  document.getElementById("srv-label-register-pass").textContent = lt("srvPass");
+  document.getElementById("srv-hint").textContent = lt("srvHint");
+  document.getElementById("srv-local-link").textContent = lt("srvLocal");
 
   function loadUser() {
     try { return JSON.parse(localStorage.getItem(USER_KEY) || "null"); }
@@ -89,15 +157,21 @@
     return Promise.resolve("fnv-" + (h >>> 0).toString(16));
   }
   function fail(msg) { errEl.textContent = msg; }
+  function setSession(username) {
+    try { sessionStorage.setItem(SESSION_KEY, username); } catch (err) {}
+    location.href = "index.html";
+  }
 
   try {
     if (sessionStorage.getItem(SESSION_KEY)) { location.replace("index.html"); return; }
   } catch (e) {}
 
   var existing = loadUser();
+  var localSub = lt("sub");
   if (!existing) {
     btn.textContent = lt("create");
-    document.querySelector(".login-card .sub").textContent = lt("noAccount");
+    subEl.textContent = lt("noAccount");
+    localSub = lt("noAccount");
   } else {
     resetBtn.classList.remove("hidden");
     resetBtn.addEventListener("click", function () {
@@ -120,10 +194,125 @@
       } else if (saved.username !== username || saved.passHash !== hash) {
         fail(lt("wrongCred")); return;
       }
-      try { sessionStorage.setItem(SESSION_KEY, username); } catch (err) {}
-      location.href = "index.html";
+      setSession(username);
     });
   });
+
+  // ---------- Login akun server (bila halaman ini dilayani server) ----------
+  // Form lokal di atas tetap menjadi tampilan bawaan: di hosting statis
+  // (tanpa server) tidak ada yang berubah. Bila server rutbhics terdeteksi
+  // lewat /api/auth/*, form server menggantikan form lokal; bila deteksi
+  // gagal (timeout/jaringan), form lokal tetap tampil tanpa error.
+  var srvMode = "login";
+  var srvForm = document.getElementById("srv-form");
+  var srvErr = document.getElementById("srv-error");
+  var srvSubmit = document.getElementById("srv-submit");
+  var srvLoginTab = document.getElementById("srv-login-tab");
+  var srvRegisterTab = document.getElementById("srv-register-tab");
+  var srvLoginFields = document.getElementById("srv-login-fields");
+  var srvRegisterFields = document.getElementById("srv-register-fields");
+  var srvOauthRow = document.getElementById("srv-oauth-row");
+  var srvOauthGoogle = document.getElementById("srv-oauth-google");
+  var srvOauthGithub = document.getElementById("srv-oauth-github");
+  function showServer(providers) {
+    localAuth.classList.add("hidden");
+    serverAuth.classList.remove("hidden");
+    subEl.textContent = lt("srvSub");
+    if (providers) {
+      srvOauthGoogle.classList.toggle("hidden", !providers.google);
+      srvOauthGithub.classList.toggle("hidden", !providers.github);
+      srvOauthRow.classList.toggle("hidden", !(providers.google || providers.github));
+    }
+    setSrvMode(srvMode);
+  }
+  function showLocal() {
+    serverAuth.classList.add("hidden");
+    localAuth.classList.remove("hidden");
+    subEl.textContent = localSub;
+  }
+  function setSrvMode(mode) {
+    srvMode = mode;
+    srvLoginTab.className = "chip" + (mode === "login" ? " active" : "");
+    srvRegisterTab.className = "chip" + (mode === "register" ? " active" : "");
+    srvLoginFields.classList.toggle("hidden", mode !== "login");
+    srvRegisterFields.classList.toggle("hidden", mode !== "register");
+    srvSubmit.textContent = mode === "login" ? lt("srvLogin") : lt("srvRegister");
+  }
+  srvLoginTab.addEventListener("click", function () { setSrvMode("login"); });
+  srvRegisterTab.addEventListener("click", function () { setSrvMode("register"); });
+  document.getElementById("srv-local-link").addEventListener("click", showLocal);
+  var SRV_ERR = {
+    username_tidak_valid: "srvErrInvalid",
+    email_tidak_valid: "srvErrInvalid",
+    hp_tidak_valid: "srvErrInvalid",
+    password_terlalu_pendek: "srvErrShort",
+    username_sudah_dipakai: "srvErrUserTaken",
+    email_sudah_dipakai: "srvErrEmailTaken",
+    hp_sudah_dipakai: "srvErrPhoneTaken",
+    kredensial_salah: "srvErrWrong",
+    terlalu_banyak_percobaan: "srvErrTooMany",
+    oauth_tidak_dikonfigurasi: "srvErrOauth"
+  };
+  function srvSubmitHandler(e) {
+    if (e) e.preventDefault();
+    var path = srvMode === "login" ? "/api/auth/login" : "/api/auth/register";
+    var body = {};
+    if (srvMode === "login") {
+      body = { identifier: document.getElementById("srv-identifier").value.trim(), password: document.getElementById("srv-login-pass").value };
+    } else {
+      body = {
+        username: document.getElementById("srv-username").value.trim(),
+        email: document.getElementById("srv-email").value.trim(),
+        phone: document.getElementById("srv-phone").value.trim(),
+        password: document.getElementById("srv-register-pass").value
+      };
+    }
+    srvErr.textContent = "";
+    fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); }).then(function (res) {
+      if (res.ok && res.body && res.body.user) {
+        // Sesi server sudah disetel server lewat cookie; penanda sesi
+        // desktop disetel di sini agar index.html tidak memantulkan lagi.
+        setSession(res.body.user.username);
+      } else {
+        var key = SRV_ERR[(res.body && res.body.error) || ""] || "srvErrGeneric";
+        srvErr.textContent = lt(key);
+      }
+    }).catch(function () { srvErr.textContent = lt("srvErrOffline"); });
+  }
+  srvForm.addEventListener("submit", srvSubmitHandler);
+  function withTimeout(ms) {
+    return new Promise(function (_, reject) {
+      setTimeout(function () { reject(new Error("timeout")); }, ms);
+    });
+  }
+  function detectServer() {
+    if (typeof fetch !== "function") return;
+    Promise.race([
+      fetch("/api/auth/providers").then(function (r) { return r.json(); }),
+      withTimeout(3000)
+    ]).then(function (providers) {
+      if (!providers || typeof providers !== "object") return;
+      return Promise.race([
+        fetch("/api/auth/me").then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); }),
+        withTimeout(3000)
+      ]).then(function (me) {
+        if (me && me.ok && me.body && me.body.user) {
+          // Sudah login (mis. baru kembali dari callback OAuth yang
+          // mengarah ke "/"): setel penanda lalu masuk desktop.
+          setSession(me.body.user.username);
+          return;
+        }
+        showServer(providers);
+      });
+    }).catch(function () {
+      // Bukan server rutbhics / tidak terjangkau: tetap di form lokal.
+    });
+  }
+  detectServer();
 })();
 </script>
 </body>
