@@ -140,6 +140,12 @@ Catatan:
   tapi tidak lagi ditampilkan sebagai
   dropdown di Obrolan; pilihan model lama yang tersimpan di perangkat
   (`wd-model`) dibersihkan otomatis saat Obrolan dibuka.
+- Validasi model (allowlist): model yang diminta lewat `POST /api/chat`
+  harus ada di `models[]`/`defaultModel` provider yang bersangkutan —
+  model tak dikenal ditolak 400 (bukan diteruskan ke upstream sampai
+  502). Provider `openai` dengan `models` kosong divalidasi terhadap
+  daftar live `{baseUrl}/models` (cache 5 menit); bila daftar live
+  gagal diambil, model ditolak 400.
 - Multi-bahasa chat: dropdown "Bahasa balasan" di Obrolan — bisa "Ikuti
   bahasa UI" atau dipilih sendiri (Indonesia, Inggris, Jepang, Korea,
   Mandarin, Arab, Spanyol, Prancis, Jerman, Portugis); persona AI
@@ -261,15 +267,26 @@ Skema `config.json`:
 
 Perilaku:
 
-- `GET /api/models` (tetap loopback-only) mengembalikan daftar
+- `GET /api/models` (akses mengikuti mode AI_ACCESS di bagian
+  Deployment) mengembalikan daftar
   gabungan `provider:model` hanya dari provider yang kuncinya ada;
   provider tanpa kunci tidak muncul. Bila tidak ada provider aktif,
   kembali ke daftar cadangan lama.
-- `POST /api/chat` (tetap loopback-only): model `provider:model`
+- `POST /api/chat` (akses mengikuti mode AI_ACCESS di bagian
+  Deployment): model `provider:model`
   diarahkan ke provider itu; model tanpa prefix dicari di daftar
-  model semua provider aktif; bila tidak ketemu, dipakai provider
-  larprouter (kompatibilitas lama). Provider ber-prefix yang tidak
-  dikenal menghasilkan 400. Balasan JSON tetap `{reply, model}`.
+  model semua provider aktif (termasuk daftar live provider `openai`
+  kosong); bila tidak ketemu, ditolak 400 `model_tidak_dikenal`
+  (bukan lagi dipakai provider pertama dengan string apa adanya).
+  Provider ber-prefix yang tidak dikenal menghasilkan 400
+  `provider_tidak_dikenal`; provider tanpa kunci menghasilkan 503.
+  Balasan JSON tetap `{reply, model}`.
+- Batasan nama model: `models[]`/`defaultModel` di `config.json`
+  tidak boleh mengandung `:` — parsing `provider:model` memotong di
+  `:` pertama, jadi model ber-`:` tidak bisa dipakai utuh. Entri
+  yang melanggar ditolak saat startup dengan peringatan jelas dan
+  tidak dipakai (`defaultModel` yang ditolak berarti provider itu
+  memakai `models[0]`/daftar live sebagai bawaan).
 - Provider `larprouter` bawaan tetap dibangun dari env
   (`LARPROUTER_API_KEY`, `LARPROUTER_BASE_URL`, `LARPROUTER_MODEL`);
   bila config punya provider id `larprouter`, `baseUrl`/`models`/

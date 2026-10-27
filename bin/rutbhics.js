@@ -116,6 +116,19 @@ const USER_CONFIG = loadUserConfig();
 function cleanBaseUrl(u) {
   return (typeof u === "string" ? u.trim() : "").replace(/\/+$/, "");
 }
+// Nama model tidak boleh mengandung ":" (S2, P3-N8): parsing
+// "provider:model" memotong di ":" pertama, jadi model ber-":" tidak
+// bisa dipakai utuh (terutama sebagai nama tanpa prefix). Entri yang
+// ditolak dicatat di log startup dan tidak dipakai. Entri non-string
+// atau kosong tetap dibuang diam-diam seperti sebelumnya.
+function validModelName(m, owner) {
+  if (typeof m !== "string" || !m.trim()) return false;
+  if (m.includes(":")) {
+    console.error('[rutbhics] ' + owner + ': nama model "' + m + '" mengandung ":", ditolak (tidak bisa dipakai dalam format "provider:model").');
+    return false;
+  }
+  return true;
+}
 function buildProviders() {
   const list = [];
   const cfgProviders = Array.isArray(USER_CONFIG.providers) ? USER_CONFIG.providers : [];
@@ -123,6 +136,14 @@ function buildProviders() {
   // menggabungkan baseUrl/models/defaultModel bila ada (env menang
   // untuk baseUrl dan defaultModel bila diset; kunci selalu dari env).
   const cfgLar = cfgProviders.find((p) => p && p.id === "larprouter");
+  let cfgLarDefault = "";
+  if (cfgLar && typeof cfgLar.defaultModel === "string" && cfgLar.defaultModel.trim()) {
+    if (cfgLar.defaultModel.includes(":")) {
+      console.error('[rutbhics] provider "larprouter": defaultModel "' + cfgLar.defaultModel + '" mengandung ":", diabaikan.');
+    } else {
+      cfgLarDefault = cfgLar.defaultModel.trim();
+    }
+  }
   const lar = {
     id: "larprouter",
     name: "Larprouter",
@@ -131,10 +152,10 @@ function buildProviders() {
     apiKeyEnv: "LARPROUTER_API_KEY",
     key: LARPROUTER_KEY,
     models: [],
-    defaultModel: process.env.LARPROUTER_MODEL || (cfgLar && typeof cfgLar.defaultModel === "string" && cfgLar.defaultModel.trim()) || "deepseek-v4.1-flash"
+    defaultModel: process.env.LARPROUTER_MODEL || cfgLarDefault || "deepseek-v4.1-flash"
   };
   if (cfgLar && Array.isArray(cfgLar.models)) {
-    lar.models = cfgLar.models.filter((m) => typeof m === "string" && m.trim()).slice(0, 100);
+    lar.models = cfgLar.models.filter((m) => validModelName(m, 'provider "larprouter"')).slice(0, 100);
   }
   if (cfgLar && typeof cfgLar.name === "string" && cfgLar.name.trim()) lar.name = cfgLar.name;
   list.push(lar);
@@ -159,6 +180,11 @@ function buildProviders() {
     if (p.apiKey !== undefined) {
       console.error('[rutbhics] provider "' + p.id + '": field "apiKey" di config.json diabaikan — kunci hanya dari .env (' + p.apiKeyEnv + ").");
     }
+    let pDefault = (typeof p.defaultModel === "string" && p.defaultModel.trim()) || "";
+    if (pDefault.includes(":")) {
+      console.error('[rutbhics] provider "' + p.id + '": defaultModel "' + pDefault + '" mengandung ":", diabaikan.');
+      pDefault = "";
+    }
     list.push({
       id: p.id,
       name: (typeof p.name === "string" && p.name.trim()) || p.id,
@@ -166,8 +192,8 @@ function buildProviders() {
       baseUrl,
       apiKeyEnv: p.apiKeyEnv,
       key: process.env[p.apiKeyEnv] || "",
-      models: Array.isArray(p.models) ? p.models.filter((m) => typeof m === "string" && m.trim()).slice(0, 100) : [],
-      defaultModel: (typeof p.defaultModel === "string" && p.defaultModel.trim()) || ""
+      models: Array.isArray(p.models) ? p.models.filter((m) => validModelName(m, 'provider "' + p.id + '"')).slice(0, 100) : [],
+      defaultModel: pDefault
     });
   }
   return list;
@@ -185,10 +211,24 @@ function serverDefaultModel() {
   const m = p.defaultModel || (p.models[0] || "");
   return m ? p.id + ":" + m : p.id;
 }
-// "provider:model" -> provider itu; tanpa prefix -> cari di daftar models
-// semua provider aktif; bila tidak ketemu -> provider larprouter (bila
-// aktif) atau provider aktif pertama (kompatibilitas lama).
-function resolveModel(reqModel) {
+// Model yang diminta harus ada di models[]/defaultModel provider itu
+// (S2, P1-N1). Provider openai dengan models kosong divalidasi terhadap
+// daftar live (cache 5 menit); bila daftar live gagal diambil, model
+// ditolak (bukan diteruskan tak tervalidasi).
+async function isModelAllowed(p, mid) {
+  if (p.models.includes(mid)) return true;
+  if (p.defaultModel && p.defaultModel === mid) return true;
+  if (p.type === "openai" && !p.models.length) {
+    const live = await fetchOpenAiModels(p);
+    return live.includes(mid);
+  }
+  return false;
+}
+// "provider:model" -> provider itu + validasi allowlist; tanpa prefix ->
+// cari di daftar models semua provider aktif (termasuk daftar live
+// provider openai kosong); bila tidak ketemu -> { unknownModel }
+// (bukan lagi jatuh ke provider pertama dengan string apa adanya).
+async function resolveModel(reqModel) {
   const colon = reqModel.indexOf(":");
   if (colon > 0) {
     const pid = reqModel.slice(0, colon);
@@ -196,7 +236,8 @@ function resolveModel(reqModel) {
     const p = PROVIDERS.find((x) => x.id === pid);
     if (!p) return { unknownProvider: true };
     if (!p.key) return { inactiveProvider: true, provider: p };
-    return { provider: p, model: mid };
+    if (await isModelAllowed(p, mid)) return { provider: p, model: mid };
+    return { unknownModel: true, provider: p };
   }
   const active = activeProviders();
   for (const p of active) {
@@ -204,10 +245,13 @@ function resolveModel(reqModel) {
       return { provider: p, model: reqModel };
     }
   }
-  const lar = active.find((p) => p.id === "larprouter");
-  const fallback = lar || active[0];
-  if (!fallback) return { unknownProvider: true };
-  return { provider: fallback, model: reqModel };
+  for (const p of active) {
+    if (p.type === "openai" && !p.models.length) {
+      const live = await fetchOpenAiModels(p);
+      if (live.includes(reqModel)) return { provider: p, model: reqModel };
+    }
+  }
+  return { unknownModel: true };
 }
 // Gabungkan pesan berurutan dengan role sama (Anthropic & Gemini menolak
 // role berurutan). Pesan digabung dengan baris kosong ganda.
@@ -346,7 +390,14 @@ async function callProvider(provider, model, systemPrompt, clean) {
   if (provider.type === "gemini") return callGemini(provider, model, systemPrompt, clean);
   return callOpenAi(provider, model, systemPrompt, clean);
 }
+// Cache daftar model live OpenAI (S2): 5 menit per provider, agar
+// validasi model + /api/models tidak memanggil upstream tiap request.
+// Hanya hasil sukses yang di-cache; gagal fetch tidak di-cache (request
+// berikutnya mencoba lagi, dan validasi model lalu menolak -> 400).
+const openAiModelsCache = new Map();
 async function fetchOpenAiModels(provider) {
+  const cached = openAiModelsCache.get(provider.id);
+  if (cached && Date.now() - cached.at < 300000) return cached.ids;
   try {
     const res = await httpJson({
       url: provider.baseUrl + "/models",
@@ -355,11 +406,13 @@ async function fetchOpenAiModels(provider) {
       timeoutMs: 15000
     });
     if (res.status !== 200 || !res.data || !Array.isArray(res.data.data)) return [];
-    return res.data.data
+    const ids = res.data.data
       .map((m) => (m && typeof m.id === "string" ? m.id : null))
       .filter(Boolean)
       .filter((v, i, a) => a.indexOf(v) === i)
       .slice(0, 100);
+    openAiModelsCache.set(provider.id, { at: Date.now(), ids });
+    return ids;
   } catch (e) { return []; }
 }
 
@@ -562,13 +615,15 @@ function handleChat(req, res) {
       ? input.system.slice(0, 500)
       : "Kamu adalah Bot Asisten di desktop Rutbhics. Jawab singkat, jelas, dan dalam Bahasa Indonesia.";
     // Model bisa dipilih klien per percakapan; dibatasi 200 karakter.
+    // Model divalidasi terhadap allowlist provider (S2): tak dikenal
+    // -> 400 model_tidak_dikenal (bukan diteruskan ke upstream).
     // Tanpa itu dipakai model bawaan server (provider:model).
     const reqModelRaw = typeof input.model === "string" && input.model.trim()
       ? input.model.trim().slice(0, 200)
       : "";
     let resolved;
     if (reqModelRaw) {
-      resolved = resolveModel(reqModelRaw);
+      resolved = await resolveModel(reqModelRaw);
     } else {
       const active = activeProviders();
       const lar = active.find((p) => p.id === "larprouter");
@@ -583,6 +638,10 @@ function handleChat(req, res) {
     }
     if (!resolved || resolved.unknownProvider) {
       sendJson(res, 400, { error: "provider_tidak_dikenal" });
+      return;
+    }
+    if (resolved.unknownModel) {
+      sendJson(res, 400, { error: "model_tidak_dikenal", message: "Model tidak tersedia untuk provider yang diminta." });
       return;
     }
     if (resolved.inactiveProvider) {
