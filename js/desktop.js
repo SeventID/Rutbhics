@@ -145,6 +145,7 @@
     });
     w.addEventListener("pointerdown", function () { focusWin(id); });
     makeDraggable(w, w.querySelector(".win-header"));
+    makeResizable(w);
     windowsEl.appendChild(w);
     openWins[id] = w;
     focusWin(id);
@@ -247,6 +248,41 @@
     handle.addEventListener("dblclick", function (e) {
       if (e.target.closest(".win-btn")) return;
       toggleMax(win);
+    });
+  }
+
+  // ---------- Resize tepi jendela (drag) ----------
+  // Pegangan di tepi kanan, bawah, dan pojok kanan-bawah. Ukuran minimum
+  // 320x240 (sama dengan min-width/min-height CSS); jendela tidak
+  // diperbesar melewati area kerja. Jendela maximize/snap tidak bisa
+  // di-resize (pegangan disembunyikan CSS + dijaga di sini).
+  function makeResizable(win) {
+    ["e", "s", "se"].forEach(function (mode) {
+      var h = document.createElement("div");
+      h.className = "win-resize " + mode;
+      h.addEventListener("pointerdown", function (e) {
+        if (win._snapState) return;
+        e.preventDefault();
+        var startW = win.offsetWidth, startH = win.offsetHeight;
+        var startX = e.clientX, startY = e.clientY;
+        var maxW = Math.max(320, window.innerWidth - win.offsetLeft);
+        var maxH = Math.max(240, window.innerHeight - TASKBAR_H - win.offsetTop);
+        try { h.setPointerCapture(e.pointerId); } catch (err) {}
+        function onMove(ev) {
+          var w = startW, hh = startH;
+          if (mode === "e" || mode === "se") w = Math.max(320, Math.min(maxW, startW + ev.clientX - startX));
+          if (mode === "s" || mode === "se") hh = Math.max(240, Math.min(maxH, startH + ev.clientY - startY));
+          win.style.width = w + "px";
+          win.style.height = hh + "px";
+        }
+        function onUp() {
+          h.removeEventListener("pointermove", onMove);
+          h.removeEventListener("pointerup", onUp);
+        }
+        h.addEventListener("pointermove", onMove);
+        h.addEventListener("pointerup", onUp);
+      });
+      win.appendChild(h);
     });
   }
 
