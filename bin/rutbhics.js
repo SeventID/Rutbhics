@@ -971,6 +971,15 @@ function checkPassword(pw, stored) {
     return hash.length === want.length && crypto.timingSafeEqual(hash, want);
   } catch (e) { return false; }
 }
+// Scrypt dummy (A2-02): menyamakan waktu respons gagal yang tidak
+// menjalankan scrypt asli (login tak-dikenal, register duplikat) dengan
+// jalur scrypt asli (~109ms). Input tetap, bukan password kiriman, agar
+// waktunya tidak bergantung pada input penyerang; hasil dibuang — bukan
+// hash yang disimpan atau dibandingkan. Parameter sama persis dengan
+// produksi: scryptSync(pw, salt, 64) tanpa opsi (default N16384/r8/p1).
+function dummyScrypt() {
+  crypto.scryptSync("rutbhics-dummy-password", "rutbhics-dummy-salt", 64);
+}
 function publicUser(u) {
   return { id: u.id, username: u.username, email: u.email || "", phone: u.phone || "", provider: u.provider || "local" };
 }
@@ -1288,6 +1297,10 @@ function handleAuth(req, res) {
       if (usersData.users.some((u) => u.username.toLowerCase() === username.toLowerCase())
         || (email && usersData.users.some((u) => (u.email || "").toLowerCase() === email.toLowerCase()))
         || (phone && usersData.users.some((u) => u.phone === phone))) {
+        // A2-02: jalur baru menjalankan hashPassword (scrypt) — samakan
+        // waktu 400 duplikat dengan scrypt dummy sebelum pesan generik.
+        // Berjalan SETELAH pemeriksaan throttle register (429 tak berubah).
+        dummyScrypt();
         sendJson(res, 400, { error: "pendaftaran_gagal" });
         return;
       }
@@ -1315,6 +1328,13 @@ function handleAuth(req, res) {
       const accountKey = user ? ("u:" + user.id) : ("i:" + identifier.toLowerCase());
       if (loginAccountBlocked(accountKey)) { sendJson(res, 429, { error: "terlalu_banyak_percobaan" }); return; }
       if (!user || !user.passHash || !checkPassword(password, user.passHash)) {
+        // A2-02: checkPassword tidak berjalan bila pengguna tidak
+        // ditemukan / tanpa passHash (short-circuit di atas) — jalankan
+        // scrypt dummy agar 401 tak-dikenal setara waktunya dengan 401
+        // salah password. Tanpa ini, selisih ~100ms membocorkan
+        // eksistensi identifier. Berjalan SETELAH kedua pemeriksaan
+        // throttle (429 tidak berubah waktunya).
+        if (!user || !user.passHash) dummyScrypt();
         noteLoginFail(ip);
         noteLoginAccountFail(accountKey);
         sendJson(res, 401, { error: "kredensial_salah" });
