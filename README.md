@@ -206,3 +206,58 @@ Metode yang tersedia:
 Catatan jujur (tahap ini): belum ada verifikasi email, lupa kata
 sandi, atau ganti kata sandi — itu tahap berikutnya bila dibutuhkan.
 
+## config.json multi-provider (gaya router AI)
+
+Tanpa `config.json`, Rutbhics hanya memakai Larprouter dari `.env`
+(perilaku lama, tidak berubah). Dengan `config.json`, chat bisa memakai
+API Anthropic, Gemini, DeepSeek, OpenAI, Larprouter, dan provider lain
+bertipe sama — seperti router AI lain.
+
+Cara memakai:
+
+1. Salin `config.example.json` menjadi `config.json` di folder tempat
+   kamu menjalankan `rutbhics` (server memuat `config.json` dari
+   folder kerja dulu, lalu folder paket; berkas ini di `.gitignore`,
+   jadi tidak ikut commit — polanya sama seperti `.env`).
+2. Isi kunci API-nya di `.env` (bukan di `config.json`!), sesuai nama
+   variabel di field `apiKeyEnv` tiap provider (mis. `ANTHROPIC_API_KEY`).
+3. Jalankan ulang `rutbhics`, buka Obrolan — dropdown model kini
+   berisi `provider:model` (mis. `anthropic:claude-sonnet-4-5`).
+
+Skema `config.json`:
+
+- `port` (opsional): port server. Prioritas port: flag `--port` >
+  env `PORT` > `config.port` > `8080`.
+- `providers[]`: tiap provider berisi:
+  - `id`: pengenal unik (mis. `anthropic`, `deepseek`).
+  - `name`: nama tampilan (opsional).
+  - `type`: `openai` (kompatibel OpenAI: OpenAI, DeepSeek,
+    Larprouter, dan sejenisnya), `anthropic`, atau `gemini`.
+  - `baseUrl`: alamat dasar API (tanpa garis miring akhir).
+  - `apiKeyEnv`: NAMA variabel env berisi kunci (mis.
+    `ANTHROPIC_API_KEY`). Inilah satu-satunya cara server mendapat
+    kunci — field `apiKey` di dalam `config.json` (bila ada)
+    DIABAIKAN dan server mencatat peringatan saat start.
+  - `models[]`: daftar model provider itu. Untuk provider `openai`
+    yang `models`-nya kosong, server mengambil live dari
+    `{baseUrl}/models`; untuk `anthropic`/`gemini`, daftar model
+    wajib dari config.
+  - `defaultModel` (opsional): model bawaan provider itu.
+
+Perilaku:
+
+- `GET /api/models` (tetap loopback-only) mengembalikan daftar
+  gabungan `provider:model` hanya dari provider yang kuncinya ada;
+  provider tanpa kunci tidak muncul. Bila tidak ada provider aktif,
+  kembali ke daftar cadangan lama.
+- `POST /api/chat` (tetap loopback-only): model `provider:model`
+  diarahkan ke provider itu; model tanpa prefix dicari di daftar
+  model semua provider aktif; bila tidak ketemu, dipakai provider
+  larprouter (kompatibilitas lama). Provider ber-prefix yang tidak
+  dikenal menghasilkan 400. Balasan JSON tetap `{reply, model}`.
+- Provider `larprouter` bawaan tetap dibangun dari env
+  (`LARPROUTER_API_KEY`, `LARPROUTER_BASE_URL`, `LARPROUTER_MODEL`);
+  bila config punya provider id `larprouter`, `baseUrl`/`models`/
+  `defaultModel`-nya digabungkan bila ada, kunci tetap dari env.
+- Saat start, server mencatat daftar id provider yang aktif (tanpa
+  nilai kunci) di log.

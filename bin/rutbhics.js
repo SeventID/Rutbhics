@@ -5,12 +5,19 @@
 // Lalu buka http://localhost:8080 di browser.
 //
 // Selain berkas statis, server ini menyediakan:
-//   POST /api/chat — proxy ke Larprouter (chat completions) untuk semua
+//   POST /api/chat — proxy ke provider AI (chat completions) untuk semua
 //   kontak di aplikasi Obrolan (Teman, Grup Keluarga, Bot Asisten, dengan
 //   persona masing-masing). Klien boleh menyertakan "model" di body untuk
-//   memilih model per percakapan; tanpa itu dipakai LARPROUTER_MODEL.
-//   GET /api/models — daftar model (live dari Larprouter bila kunci ada,
-//   kalau tidak daftar cadangan).
+//   memilih model per percakapan; tanpa itu dipakai model bawaan server.
+//   GET /api/models — daftar model gabungan "provider:model" dari semua
+//   provider aktif (live dari upstream bila perlu; kalau tidak ada
+//   provider aktif, daftar cadangan).
+//   config.json (opsional, di folder kerja atau folder paket) — setelan
+//   seperti port dan daftar provider AI (Anthropic, Gemini, DeepSeek,
+//   OpenAI, Larprouter, ...). Kunci API TIDAK PERNAH di config.json:
+//   config hanya menunjuk nama variabel env (apiKeyEnv), kunci dibaca
+//   dari .env. Lihat config.example.json. Prioritas port: --port >
+//   PORT > config.port > 8080.
 //   /api/rooms + /api/rooms/:id/messages — chat multi-user (ruang + pesan
 //   di berkas rutbhics-chat.json di folder kerja). Sengaja TIDAK dibatasi
 //   loopback: perangkat lain di jaringan harus bisa ikut. Membaca ruang
@@ -81,14 +88,284 @@ const FALLBACK_MODELS = [
   "glm-5.3-flash"
 ];
 const LARPROUTER_KEY = process.env.LARPROUTER_API_KEY || "";
-const API_KEY_CONFIGURED = LARPROUTER_KEY.length > 0;
+
+// ---------- config.json multi-provider (gaya router AI) ----------
+// Berkas opsional: folder kerja dulu, lalu folder paket. Bila tidak ada,
+// perilaku bawaan persis seperti dulu (hanya Larprouter dari env).
+// SKEMA: { port?, providers[] } — provider: { id, name?, type
+// ("openai"|"anthropic"|"gemini"), baseUrl, apiKeyEnv (NAMA variabel
+// env), models[]?, defaultModel? }. KUNCI TIDAK PERNAH DI config.json:
+// bila ada field "apiKey" di config, field itu DIABAIKAN; kunci selalu
+// dibaca dari process.env (loader .env di atas).
+function loadUserConfig() {
+  const files = [path.join(process.cwd(), "config.json"), path.join(ROOT, "config.json")];
+  for (const f of files) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(f, "utf8"));
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
+    } catch (e) {
+      if (e && e.code !== "ENOENT") console.error("[rutbhics] config.json tidak bisa dibaca, diabaikan: " + f);
+    }
+  }
+  return {};
+}
+const USER_CONFIG = loadUserConfig();
+
+function cleanBaseUrl(u) {
+  return (typeof u === "string" ? u.trim() : "").replace(/\/+$/, "");
+}
+function buildProviders() {
+  const list = [];
+  const cfgProviders = Array.isArray(USER_CONFIG.providers) ? USER_CONFIG.providers : [];
+  // Provider bawaan Larprouter dari env; entri config id "larprouter"
+  // menggabungkan baseUrl/models/defaultModel bila ada (env menang
+  // untuk baseUrl dan defaultModel bila diset; kunci selalu dari env).
+  const cfgLar = cfgProviders.find((p) => p && p.id === "larprouter");
+  const lar = {
+    id: "larprouter",
+    name: "Larprouter",
+    type: "openai",
+    baseUrl: process.env.LARPROUTER_BASE_URL ? LARPROUTER_BASE : (cfgLar && cleanBaseUrl(cfgLar.baseUrl)) || LARPROUTER_BASE,
+    apiKeyEnv: "LARPROUTER_API_KEY",
+    key: LARPROUTER_KEY,
+    models: [],
+    defaultModel: process.env.LARPROUTER_MODEL || (cfgLar && typeof cfgLar.defaultModel === "string" && cfgLar.defaultModel.trim()) || "deepseek-v4.1-flash"
+  };
+  if (cfgLar && Array.isArray(cfgLar.models)) {
+    lar.models = cfgLar.models.filter((m) => typeof m === "string" && m.trim()).slice(0, 100);
+  }
+  if (cfgLar && typeof cfgLar.name === "string" && cfgLar.name.trim()) lar.name = cfgLar.name;
+  list.push(lar);
+  const seen = new Set(["larprouter"]);
+  for (const p of cfgProviders) {
+    if (!p || typeof p !== "object" || p.id === "larprouter") continue;
+    if (typeof p.id !== "string" || !p.id.trim()) continue;
+    if (seen.has(p.id)) continue;
+    seen.add(p.id);
+    if (p.type !== "openai" && p.type !== "anthropic" && p.type !== "gemini") continue;
+    const baseUrl = cleanBaseUrl(p.baseUrl);
+    if (!baseUrl) continue;
+    if (typeof p.apiKeyEnv !== "string" || !p.apiKeyEnv.trim()) continue;
+    if (p.apiKey !== undefined) {
+      console.error('[rutbhics] provider "' + p.id + '": field "apiKey" di config.json diabaikan — kunci hanya dari .env (' + p.apiKeyEnv + ").");
+    }
+    list.push({
+      id: p.id,
+      name: (typeof p.name === "string" && p.name.trim()) || p.id,
+      type: p.type,
+      baseUrl,
+      apiKeyEnv: p.apiKeyEnv,
+      key: process.env[p.apiKeyEnv] || "",
+      models: Array.isArray(p.models) ? p.models.filter((m) => typeof m === "string" && m.trim()).slice(0, 100) : [],
+      defaultModel: (typeof p.defaultModel === "string" && p.defaultModel.trim()) || ""
+    });
+  }
+  return list;
+}
+const PROVIDERS = buildProviders();
+function activeProviders() {
+  return PROVIDERS.filter((p) => p.key);
+}
+// Model bawaan server dalam format "provider:model" (untuk dropdown).
+function serverDefaultModel() {
+  const active = activeProviders();
+  if (!active.length) return LARPROUTER_MODEL;
+  const lar = active.find((p) => p.id === "larprouter");
+  const p = lar || active[0];
+  const m = p.defaultModel || (p.models[0] || "");
+  return m ? p.id + ":" + m : p.id;
+}
+// "provider:model" -> provider itu; tanpa prefix -> cari di daftar models
+// semua provider aktif; bila tidak ketemu -> provider larprouter (bila
+// aktif) atau provider aktif pertama (kompatibilitas lama).
+function resolveModel(reqModel) {
+  const colon = reqModel.indexOf(":");
+  if (colon > 0) {
+    const pid = reqModel.slice(0, colon);
+    const mid = reqModel.slice(colon + 1);
+    const p = PROVIDERS.find((x) => x.id === pid);
+    if (!p) return { unknownProvider: true };
+    if (!p.key) return { inactiveProvider: true, provider: p };
+    return { provider: p, model: mid };
+  }
+  const active = activeProviders();
+  for (const p of active) {
+    if (p.models.includes(reqModel) || (p.defaultModel && p.defaultModel === reqModel)) {
+      return { provider: p, model: reqModel };
+    }
+  }
+  const lar = active.find((p) => p.id === "larprouter");
+  const fallback = lar || active[0];
+  if (!fallback) return { unknownProvider: true };
+  return { provider: fallback, model: reqModel };
+}
+// Gabungkan pesan berurutan dengan role sama (Anthropic & Gemini menolak
+// role berurutan). Pesan digabung dengan baris kosong ganda.
+function mergeRoles(msgs) {
+  const out = [];
+  for (const m of msgs) {
+    const last = out[out.length - 1];
+    if (last && last.role === m.role) last.content += "\n\n" + m.content;
+    else out.push({ role: m.role, content: m.content });
+  }
+  return out;
+}
+// Permintaan JSON generik (http/https sesuai protokol) -> { status, data }.
+function httpJson(opts) {
+  return new Promise((resolve, reject) => {
+    const target = new URL(opts.url);
+    const mod = target.protocol === "http:" ? http : https;
+    const body = opts.body || null;
+    const r = mod.request({
+      method: opts.method || "GET",
+      hostname: target.hostname,
+      port: target.port || (target.protocol === "http:" ? 80 : 443),
+      path: target.pathname + target.search,
+      headers: opts.headers || {},
+      timeout: opts.timeoutMs || 60000
+    }, (res) => {
+      const chunks = [];
+      res.on("data", (c) => chunks.push(c));
+      res.on("end", () => {
+        let data = null;
+        try { data = JSON.parse(Buffer.concat(chunks).toString("utf8")); } catch (e) { /* abaikan */ }
+        resolve({ status: res.statusCode, data });
+      });
+    });
+    r.on("timeout", () => { r.destroy(new Error("timeout")); });
+    r.on("error", reject);
+    if (body) r.write(body);
+    r.end();
+  });
+}
+function providerErrorCode(provider) {
+  return provider.id === "larprouter" ? "larprouter_gagal" : "provider_gagal";
+}
+async function callOpenAi(provider, model, systemPrompt, clean) {
+  const payload = JSON.stringify({
+    model,
+    max_tokens: 1024,
+    messages: [{ role: "system", content: systemPrompt }].concat(clean)
+  });
+  const res = await httpJson({
+    url: provider.baseUrl + "/chat/completions",
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Content-Length": Buffer.byteLength(payload),
+      Authorization: "Bearer " + provider.key
+    },
+    body: payload,
+    timeoutMs: 60000
+  });
+  const data = res.data;
+  if (res.status !== 200 || !data || !data.choices || !data.choices[0] || !data.choices[0].message) {
+    const detail = data && data.error && data.error.message
+      ? String(data.error.message).slice(0, 300)
+      : provider.name + " tidak mengembalikan jawaban.";
+    throw new Error(detail);
+  }
+  return data.choices[0].message.content;
+}
+async function callAnthropic(provider, model, systemPrompt, clean) {
+  const payload = JSON.stringify({
+    model,
+    max_tokens: 1024,
+    system: systemPrompt,
+    messages: mergeRoles(clean)
+  });
+  const res = await httpJson({
+    url: provider.baseUrl + "/messages",
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Content-Length": Buffer.byteLength(payload),
+      "x-api-key": provider.key,
+      "anthropic-version": "2023-06-01"
+    },
+    body: payload,
+    timeoutMs: 60000
+  });
+  const data = res.data;
+  const texts = data && Array.isArray(data.content)
+    ? data.content.filter((b) => b && b.type === "text" && typeof b.text === "string").map((b) => b.text)
+    : [];
+  if (res.status !== 200 || !texts.length) {
+    const detail = data && data.error && data.error.message
+      ? String(data.error.message).slice(0, 300)
+      : provider.name + " tidak mengembalikan jawaban.";
+    throw new Error(detail);
+  }
+  return texts.join("");
+}
+async function callGemini(provider, model, systemPrompt, clean) {
+  const contents = mergeRoles(clean).map((m) => ({
+    role: m.role === "assistant" ? "model" : "user",
+    parts: [{ text: m.content }]
+  }));
+  const body = {
+    contents,
+    generationConfig: { maxOutputTokens: 1024 }
+  };
+  if (systemPrompt) body.system_instruction = { parts: [{ text: systemPrompt }] };
+  const payload = JSON.stringify(body);
+  const res = await httpJson({
+    url: provider.baseUrl + "/models/" + encodeURIComponent(model) + ":generateContent?key=" + encodeURIComponent(provider.key),
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Content-Length": Buffer.byteLength(payload)
+    },
+    body: payload,
+    timeoutMs: 60000
+  });
+  const data = res.data;
+  const parts = data && Array.isArray(data.candidates) && data.candidates[0] && data.candidates[0].content && Array.isArray(data.candidates[0].content.parts)
+    ? data.candidates[0].content.parts.filter((p) => p && typeof p.text === "string").map((p) => p.text)
+    : [];
+  if (res.status !== 200 || !parts.length) {
+    const detail = data && data.error && data.error.message
+      ? String(data.error.message).slice(0, 300)
+      : provider.name + " tidak mengembalikan jawaban.";
+    throw new Error(detail);
+  }
+  return parts.join("");
+}
+async function callProvider(provider, model, systemPrompt, clean) {
+  if (provider.type === "anthropic") return callAnthropic(provider, model, systemPrompt, clean);
+  if (provider.type === "gemini") return callGemini(provider, model, systemPrompt, clean);
+  return callOpenAi(provider, model, systemPrompt, clean);
+}
+async function fetchOpenAiModels(provider) {
+  try {
+    const res = await httpJson({
+      url: provider.baseUrl + "/models",
+      method: "GET",
+      headers: { Authorization: "Bearer " + provider.key },
+      timeoutMs: 15000
+    });
+    if (res.status !== 200 || !res.data || !Array.isArray(res.data.data)) return [];
+    return res.data.data
+      .map((m) => (m && typeof m.id === "string" ? m.id : null))
+      .filter(Boolean)
+      .filter((v, i, a) => a.indexOf(v) === i)
+      .slice(0, 100);
+  } catch (e) { return []; }
+}
 
 function parsePort(argv) {
-  let port = parseInt(process.env.PORT, 10);
+  // Prioritas: --port > PORT > config.port > 8080 (yang tidak valid dilewati).
+  const valid = (n) => Number.isInteger(n) && n >= 1 && n <= 65535;
   const i = argv.indexOf("--port");
-  if (i !== -1 && argv[i + 1]) port = parseInt(argv[i + 1], 10);
-  if (!port || port < 1 || port > 65535) port = 8080;
-  return port;
+  if (i !== -1 && argv[i + 1]) {
+    const p = parseInt(argv[i + 1], 10);
+    if (valid(p)) return p;
+  }
+  const e = parseInt(process.env.PORT, 10);
+  if (valid(e)) return e;
+  const c = parseInt(USER_CONFIG.port, 10);
+  if (valid(c)) return c;
+  return 8080;
 }
 
 function isLoopback(req) {
@@ -117,6 +394,7 @@ function readBody(req, limit) {
 }
 
 // ---------- Proxy Bot AI -> Larprouter ----------
+// ---------- Proxy Bot AI -> multi-provider (config.json) ----------
 function handleChat(req, res) {
   // Hanya dari perangkat ini: kunci dibayar pemiliknya, jangan sampai
   // dipakai perangkat lain yang se-jaringan.
@@ -125,21 +403,22 @@ function handleChat(req, res) {
     return;
   }
   if (req.method === "GET") {
-    sendJson(res, 200, { active: API_KEY_CONFIGURED, model: LARPROUTER_MODEL });
+    const active = activeProviders();
+    sendJson(res, 200, { active: active.length > 0, model: serverDefaultModel() });
     return;
   }
   if (req.method !== "POST") {
     sendJson(res, 405, { error: "method_tidak_didukung" });
     return;
   }
-  if (!API_KEY_CONFIGURED) {
+  if (!activeProviders().length) {
     sendJson(res, 503, {
       error: "bot_ai_tidak_aktif",
-      message: "Bot AI belum aktif: isi LARPROUTER_API_KEY di berkas .env (salin dari .env.example), lalu jalankan ulang rutbhics."
+      message: "Bot AI belum aktif: isi kunci API provider di berkas .env (salin dari .env.example), lalu jalankan ulang rutbhics."
     });
     return;
   }
-  readBody(req, 65536).then((raw) => {
+  readBody(req, 65536).then(async (raw) => {
     let input;
     try { input = JSON.parse(raw); } catch (e) { sendJson(res, 400, { error: "json_tidak_valid" }); return; }
     const msgs = Array.isArray(input.messages) ? input.messages : [];
@@ -157,67 +436,58 @@ function handleChat(req, res) {
       ? input.system.slice(0, 500)
       : "Kamu adalah Bot Asisten di desktop Rutbhics. Jawab singkat, jelas, dan dalam Bahasa Indonesia.";
     // Model bisa dipilih klien per percakapan; dibatasi 200 karakter.
-    // Tanpa itu dipakai model bawaan server (LARPROUTER_MODEL).
-    const reqModel = typeof input.model === "string" && input.model.trim()
+    // Tanpa itu dipakai model bawaan server (provider:model).
+    const reqModelRaw = typeof input.model === "string" && input.model.trim()
       ? input.model.trim().slice(0, 200)
-      : LARPROUTER_MODEL;
-    const payload = JSON.stringify({
-      model: reqModel,
-      max_tokens: 1024,
-      messages: [{ role: "system", content: systemPrompt }].concat(clean)
-    });
-    const target = new URL(LARPROUTER_BASE + "/chat/completions");
-    const upMod = target.protocol === "http:" ? http : https;
-    let responded = false;
-    const replyOnce = (status, obj) => {
-      if (responded) return;
-      responded = true;
-      sendJson(res, status, obj);
-    };
-    const up = upMod.request({
-      method: "POST",
-      hostname: target.hostname,
-      port: target.port || 443,
-      path: target.pathname + target.search,
-      headers: {
-        "Content-Type": "application/json",
-        "Content-Length": Buffer.byteLength(payload),
-        Authorization: "Bearer " + LARPROUTER_KEY
-      },
-      timeout: 60000
-    }, (upRes) => {
-      const chunks = [];
-      upRes.on("data", (c) => chunks.push(c));
-      upRes.on("end", () => {
-        let data = null;
-        try { data = JSON.parse(Buffer.concat(chunks).toString("utf8")); } catch (e) { /* abaikan */ }
-        if (upRes.statusCode !== 200 || !data || !data.choices ||
-            !data.choices[0] || !data.choices[0].message) {
-          const detail = data && data.error && data.error.message
-            ? String(data.error.message).slice(0, 300)
-            : "Larprouter tidak mengembalikan jawaban.";
-          replyOnce(502, { error: "larprouter_gagal", message: detail });
-          return;
-        }
-        replyOnce(200, { reply: data.choices[0].message.content, model: reqModel });
+      : "";
+    let resolved;
+    if (reqModelRaw) {
+      resolved = resolveModel(reqModelRaw);
+    } else {
+      const active = activeProviders();
+      const lar = active.find((p) => p.id === "larprouter");
+      const p = lar || active[0];
+      let m = p.defaultModel || (p.models[0] || "");
+      if (!m && p.type === "openai") {
+        const live = await fetchOpenAiModels(p);
+        if (live.length) m = live[0];
+      }
+      if (!m) { sendJson(res, 400, { error: "model_tidak_ditemukan" }); return; }
+      resolved = { provider: p, model: m };
+    }
+    if (!resolved || resolved.unknownProvider) {
+      sendJson(res, 400, { error: "provider_tidak_dikenal" });
+      return;
+    }
+    if (resolved.inactiveProvider) {
+      sendJson(res, 503, {
+        error: "provider_tidak_aktif",
+        message: "Provider " + resolved.provider.name + " belum dikonfigurasi kuncinya di .env."
       });
-    });
-    up.on("timeout", () => { up.destroy(new Error("timeout")); });
-    up.on("error", () => {
-      replyOnce(502, {
-        error: "larprouter_gagal",
-        message: "Tidak bisa menghubungi Larprouter. Periksa koneksi internet / LARPROUTER_BASE_URL di .env."
+      return;
+    }
+    const replyModel = reqModelRaw || (resolved.provider.id + ":" + resolved.model);
+    try {
+      const reply = await callProvider(resolved.provider, resolved.model, systemPrompt, clean);
+      sendJson(res, 200, { reply, model: replyModel });
+    } catch (e) {
+      sendJson(res, 502, {
+        error: providerErrorCode(resolved.provider),
+        message: (e && e.message ? String(e.message) : resolved.provider.name + " tidak mengembalikan jawaban.").slice(0, 300)
       });
-    });
-    up.write(payload);
-    up.end();
+    }
   }).catch(() => { sendJson(res, 400, { error: "body_tidak_valid" }); });
 }
 
 // ---------- Daftar model -> Larprouter ----------
 // GET /api/models (loopback saja, seperti /api/chat): daftar model live
 // dari Larprouter bila kunci ada; kalau tidak, daftar cadangan.
-function handleModels(req, res) {
+// ---------- Daftar model gabungan dari semua provider aktif ----------
+// GET /api/models (loopback saja, seperti /api/chat): "provider:model"
+// hanya dari provider yang kuncinya ada. Provider openai dengan models
+// kosong diambil live dari {baseUrl}/models; anthropic/gemini wajib dari
+// config. Bila gabungan kosong, kembali ke daftar cadangan lama.
+async function handleModels(req, res) {
   if (!isLoopback(req)) {
     sendJson(res, 403, { error: "forbidden", message: "Endpoint /api/models hanya untuk pemakaian lokal." });
     return;
@@ -226,37 +496,34 @@ function handleModels(req, res) {
     sendJson(res, 405, { error: "method_tidak_didukung" });
     return;
   }
-  let responded = false;
-  const once = (obj) => { if (!responded) { responded = true; sendJson(res, 200, obj); } };
-  const fallback = () => once({ models: FALLBACK_MODELS.slice(), source: "fallback" });
-  if (!API_KEY_CONFIGURED) { fallback(); return; }
-  const target = new URL(LARPROUTER_BASE + "/models");
-  const mod = target.protocol === "http:" ? http : https;
-  const up = mod.request({
-    method: "GET",
-    hostname: target.hostname,
-    port: target.port || (target.protocol === "http:" ? 80 : 443),
-    path: target.pathname + target.search,
-    headers: { Authorization: "Bearer " + LARPROUTER_KEY },
-    timeout: 15000
-  }, (upRes) => {
-    const chunks = [];
-    upRes.on("data", (c) => chunks.push(c));
-    upRes.on("end", () => {
-      let data = null;
-      try { data = JSON.parse(Buffer.concat(chunks).toString("utf8")); } catch (e) { /* abaikan */ }
-      const ids = data && Array.isArray(data.data) ? data.data
-        .map((m) => (m && typeof m.id === "string" ? m.id : null))
-        .filter(Boolean)
-        .filter((v, i, a) => a.indexOf(v) === i)
-        .slice(0, 100) : [];
-      if (upRes.statusCode !== 200 || !ids.length) { fallback(); return; }
-      once({ models: ids, source: "live" });
+  const active = activeProviders();
+  if (!active.length) {
+    sendJson(res, 200, { models: FALLBACK_MODELS.slice(), source: "fallback" });
+    return;
+  }
+  const combined = [];
+  let usedLive = false;
+  const liveJobs = [];
+  for (const p of active) {
+    if (p.models.length) {
+      for (const m of p.models) combined.push(p.id + ":" + m);
+    } else if (p.type === "openai") {
+      liveJobs.push(p);
+    }
+  }
+  if (liveJobs.length) {
+    const results = await Promise.all(liveJobs.map((p) => fetchOpenAiModels(p)));
+    results.forEach((ids, i) => {
+      if (ids.length) usedLive = true;
+      for (const m of ids) combined.push(liveJobs[i].id + ":" + m);
     });
-  });
-  up.on("timeout", () => { up.destroy(new Error("timeout")); });
-  up.on("error", () => fallback());
-  up.end();
+  }
+  const deduped = combined.filter((v, i, a) => a.indexOf(v) === i).slice(0, 200);
+  if (!deduped.length) {
+    sendJson(res, 200, { models: FALLBACK_MODELS.slice(), source: "fallback" });
+    return;
+  }
+  sendJson(res, 200, { models: deduped, source: usedLive ? "live" : "config" });
 }
 
 // ---------- Chat multi-user (ruang + pesan, via berkas JSON) ----------
@@ -695,9 +962,12 @@ const server = http.createServer((req, res) => {
 server.listen(port, () => {
   console.log("Rutbhics berjalan di http://localhost:" + port);
   console.log("Buka alamat itu di browser. Tekan Ctrl+C untuk berhenti.");
-  if (API_KEY_CONFIGURED) {
-    console.log("Bot AI: aktif (model " + LARPROUTER_MODEL + ")");
+  const activeIds = activeProviders().map((p) => p.id);
+  if (activeIds.length) {
+    console.log("Bot AI: aktif (model " + serverDefaultModel() + ")");
+    console.log("Penyedia AI aktif: " + activeIds.join(", "));
   } else {
-    console.log("Bot AI: nonaktif — jalankan `rutbhics --setup` atau isi LARPROUTER_API_KEY di .env untuk mengaktifkan AI.");
+    console.log("Bot AI: nonaktif — jalankan `rutbhics --setup` atau isi kunci API provider di .env untuk mengaktifkan AI.");
+    console.log("Penyedia AI aktif: tidak ada");
   }
 });
