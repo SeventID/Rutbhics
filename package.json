@@ -25,5 +25,5 @@
     "start": "node bin/rutbhics.js",
     "postinstall": "node scripts/postinstall.js"
   },
-  "version": "1.0.2"
+  "version": "1.0.3"
 }
