@@ -7,7 +7,7 @@
 Tanpa build step, tanpa framework — murni HTML + CSS + JavaScript vanilla.
 
 [![npm version](https://img.shields.io/npm/v/rutbhics)](https://www.npmjs.com/package/rutbhics)
-[![License: BSD 3-Clause](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 </div>
 
