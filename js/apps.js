@@ -106,6 +106,11 @@
     notesSave: { id: "Simpan", en: "Save" },
     notesSaved: { id: "Tersimpan ✓", en: "Saved ✓" },
     notesSaveFail: { id: "Gagal menyimpan (penyimpanan lokal penuh?)", en: "Save failed (local storage full?)" },
+    notesSearch: { id: "Cari di catatan...", en: "Search notes..." },
+    notesSearchNext: { id: "Berikutnya", en: "Next" },
+    notesSearchCount: { id: "Hasil {i} dari {n}", en: "Result {i} of {n}" },
+    notesSearchNone: { id: "Tidak ditemukan", en: "Not found" },
+    notesAutoSaved: { id: "Tersimpan otomatis \u2713", en: "Autosaved \u2713" },
     filesUp: { id: "↑ Naik", en: "↑ Up" },
     filesNewFolder: { id: "Folder Baru", en: "New Folder" },
     filesNewFile: { id: "Berkas Baru", en: "New File" },
@@ -659,15 +664,63 @@
 
   // ---------- Catatan ----------
   function renderNotes(body) {
+    var searchRow = document.createElement("div");
+    searchRow.style.cssText = "display:flex;gap:8px;align-items:center;margin-bottom:10px";
+    var search = el('<input class="notes-search" type="text" placeholder="' + tr("notesSearch") + '">');
+    var nextBtn = el('<button class="chip">' + tr("notesSearchNext") + '</button>');
+    var count = el('<span class="hint"></span>');
+    searchRow.appendChild(search); searchRow.appendChild(nextBtn); searchRow.appendChild(count);
     var area = el('<textarea class="notes-area" placeholder="' + tr("notesPlaceholder") + '"></textarea>');
     area.value = store("wd-notes", "");
     var btn = el('<button class="btn-primary" style="margin-top:10px">' + tr("notesSave") + '</button>');
     var ok = el('<span class="hint" style="margin-left:10px"></span>');
+    // Autosave (debounce 800 ms): mengetik saja sudah menyimpan; tombol
+    // Simpan tetap ada untuk penyimpanan seketika. Status memakai boolean
+    // save() (P2e): gagal simpan tidak pernah diklaim "tersimpan".
+    var timer = null;
+    area.addEventListener("input", function () {
+      ok.textContent = "";
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(function () {
+        ok.textContent = save("wd-notes", area.value) ? tr("notesAutoSaved") : tr("notesSaveFail");
+      }, 800);
+    });
+    // Pencarian di dalam catatan: sorot lewat seleksi bawaan textarea
+    // (textarea tidak mendukung sorotan bergaya HTML). "Berikutnya" /
+    // Enter berpindah ke hasil selanjutnya (melintasi daftar).
+    var matchIdx = 0;
+    function findMatches(q) {
+      if (!q) return [];
+      var text = area.value.toLowerCase(), needle = q.toLowerCase(), out = [], i = 0;
+      while (true) {
+        var j = text.indexOf(needle, i);
+        if (j === -1) break;
+        out.push(j);
+        i = j + Math.max(1, needle.length);
+      }
+      return out;
+    }
+    function jumpToMatch(first) {
+      var q = search.value;
+      var ms = findMatches(q);
+      if (!q) { count.textContent = ""; return; }
+      if (!ms.length) { count.textContent = tr("notesSearchNone"); return; }
+      if (first) matchIdx = 0;
+      else matchIdx = (matchIdx + 1) % ms.length;
+      var at = ms[matchIdx];
+      try { area.focus(); area.setSelectionRange(at, at + q.length); } catch (e) {}
+      count.textContent = tr("notesSearchCount").replace("{i}", String(matchIdx + 1)).replace("{n}", String(ms.length));
+    }
+    search.addEventListener("input", function () { jumpToMatch(true); });
+    nextBtn.addEventListener("click", function () { jumpToMatch(false); });
+    search.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") { e.preventDefault(); jumpToMatch(false); }
+    });
     btn.addEventListener("click", function () {
       ok.textContent = save("wd-notes", area.value) ? tr("notesSaved") : tr("notesSaveFail");
       setTimeout(function () { ok.textContent = ""; }, 2000);
     });
-    body.appendChild(area); body.appendChild(btn); body.appendChild(ok);
+    body.appendChild(searchRow); body.appendChild(area); body.appendChild(btn); body.appendChild(ok);
   }
 
   // ---------- Kalkulator ----------
