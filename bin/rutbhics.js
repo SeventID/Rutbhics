@@ -140,6 +140,14 @@ function buildProviders() {
   for (const p of cfgProviders) {
     if (!p || typeof p !== "object" || p.id === "larprouter") continue;
     if (typeof p.id !== "string" || !p.id.trim()) continue;
+    // Id dipakai dalam format "provider:model" (resolveModel memotong di
+    // ":" pertama): ":" akan memecah parsing, spasi dan "/" merusak
+    // pencocokan/pembacaan. Provider bermasalah diabaikan dengan
+    // peringatan; server tetap jalan dengan provider lain.
+    if (/[:\s/]/.test(p.id)) {
+      console.error('[rutbhics] provider "' + p.id + '": id tidak valid (tidak boleh mengandung ":", spasi, atau "/"), diabaikan.');
+      continue;
+    }
     if (seen.has(p.id)) continue;
     seen.add(p.id);
     if (p.type !== "openai" && p.type !== "anthropic" && p.type !== "gemini") continue;
