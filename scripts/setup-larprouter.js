@@ -62,6 +62,7 @@ function writeModel(file, model) {
   }
   while (out.length > 1 && out[out.length - 1] === "") out.pop();
   fs.writeFileSync(file, out.join("\n") + "\n", "utf8");
+  try { fs.chmodSync(file, 0o600); } catch (e) { /* Windows: abaikan */ }
 }
 
 function writeKey(file, key) {
@@ -83,6 +84,7 @@ function writeKey(file, key) {
   // Buang baris kosong berlebih di akhir, lalu akhiri dengan newline.
   while (out.length > 1 && out[out.length - 1] === "") out.pop();
   fs.writeFileSync(file, out.join("\n") + "\n", "utf8");
+  try { fs.chmodSync(file, 0o600); } catch (e) { /* Windows: abaikan */ }
 }
 
 // Baca satu baris dari file descriptor (terminal), tanpa buffering rumit.
@@ -100,12 +102,15 @@ function readLine(fd) {
   return line;
 }
 
+// Mengembalikan true bila stty jalan; false bila tidak tersedia (ketikan
+// kunci akan terlihat — pemanggil wajib memperingatkan, P2c).
 function setEcho(fd, on) {
   try {
-    child_process.spawnSync("stty", [on ? "echo" : "-echo"], {
+    const r = child_process.spawnSync("stty", [on ? "echo" : "-echo"], {
       stdio: [fd, "ignore", "ignore"]
     });
-  } catch (e) { /* stty tidak tersedia: ketikan tetap terlihat, tidak fatal */ }
+    return !r.error;
+  } catch (e) { return false; }
 }
 
 function askModelStep(fd, targetEnv) {
@@ -128,6 +133,12 @@ function runSetup(targetEnv, opts) {
     opts = opts || {};
     const askModel = opts.askModel === true;
     const keyExists = envHasKey(targetEnv);
+    // Berkas lama pun dipersempit izinnya (P2c): kunci sudah ada di sini.
+    // Dilakukan di depan agar semua jalur (early-return maupun askModel)
+    // mendapatkannya, bukan hanya satu cabang.
+    if (keyExists) {
+      try { fs.chmodSync(targetEnv, 0o600); } catch (e) { /* Windows: abaikan */ }
+    }
     if (keyExists && !askModel) {
       console.log("Rutbhics: API Larprouter sudah tersimpan, setup dilewati.");
       return "already";
@@ -157,7 +168,9 @@ function runSetup(targetEnv, opts) {
           return "declined";
         }
         fs.writeSync(fd, "Masukkan API Larprouter Anda: ");
-        setEcho(fd, false);
+        if (!setEcho(fd, false)) {
+          fs.writeSync(fd, "\nPERINGATAN: stty tidak tersedia — ketikan kunci AKAN TERLIHAT di layar.\n");
+        }
         let key = "";
         try { key = readLine(fd).trim(); }
         finally { setEcho(fd, true); fs.writeSync(fd, "\n"); }
