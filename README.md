@@ -88,7 +88,7 @@ Urutan pembangunan berikutnya (satu item per jadwal build):
 4. Musik/video player mini — selesai 26 Okt 2026
 5. Terminal web (perintah semu: help, about, echo, date) — selesai 26 Okt 2026
 11. Bot AI di Obrolan (Larprouter via proxy lokal + .env) — selesai 26 Okt 2026 (dimajukan atas permintaan langsung)
-12. Chat multi-user beneran (backend server: akun + pesan real-time) — berikutnya, belum dikerjakan
+12. Chat multi-user (ruang + pesan via server, polling 3 detik) — selesai 27 Okt 2026
 6. Mode jendela maximize + snap kiri/kanan
 7. Aplikasi Gambar (kanvas coret-coret + simpan)
 8. Widget jam/kalender di desktop
@@ -117,7 +117,7 @@ Semua kontak di aplikasi Obrolan (Teman, Grup Keluarga, Bot Asisten) menjawab
 memakai AI Larprouter (OpenAI-compatible), bukan lagi balasan demo acak —
 masing-masing dengan persona-nya sendiri (teman akrab, anggota keluarga,
 asisten). Catatan jujur: mereka tetap persona AI, bukan orang sungguhan;
-chat antar pengguna beneran butuh backend server (tahap berikutnya).
+chat antar pengguna beneran ada di mode "👥 Multi-User" (lihat di bawah).
 
 Cara mengaktifkan:
 
@@ -145,6 +145,27 @@ Catatan:
 - Tanpa `.env` (atau bila halaman dibuka sebagai situs statis tanpa server
   lokal), Bot Asisten memberi tahu cara mengaktifkannya, bukan berpura-pura
   menjawab pakai AI.
-- Chat multi-user beneran (antar pengguna lewat server) belum ada — itu tahap
-  berikutnya dan butuh backend terpisah.
+## Chat multi-user
+
+Obrolan juga punya mode multi-user (tombol "👥 Multi-User" di atas daftar
+kontak): pesan disimpan di server `rutbhics` dan terlihat semua perangkat
+yang membuka server yang sama.
+
+Cara memakai:
+
+1. Jalankan `rutbhics` di satu perangkat (ini servernya).
+2. Dari perangkat lain di jaringan yang sama, buka `http://<IP-perangkat-server>:8080`.
+3. Buka Obrolan → "👥 Multi-User", isi nama, pilih/buat ruang, kirim pesan.
+   Pesan baru diambil tiap 3 detik.
+
+Catatan jujur (tahap 1):
+
+- Tanpa akun server: nama pengirim adalah nama yang diklaim tiap perangkat
+  (diambil dari login desktop atau kolom nama), jadi siapa pun di jaringan
+  bisa memakai nama apa pun. Jangan pakai untuk percakapan rahasia.
+- Pesan tersimpan di berkas `rutbhics-chat.json` di folder tempat `rutbhics`
+  dijalankan (bertahan saat server di-restart); maksimal 20 ruang dan 500
+  pesan terakhir per ruang.
+- Endpoint AI (`/api/chat`, `/api/models`) tetap hanya menerima koneksi
+  lokal, supaya kunci Larprouter tidak bisa dipakai perangkat lain.
 

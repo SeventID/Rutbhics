@@ -161,6 +161,8 @@ input, textarea { font: inherit; color: var(--ink); }
 }
 .chat-model-row { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
 .chat-model { flex: 1; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border); background: rgba(255, 255, 255, .06); color: var(--ink); outline: none; }
+.msg-name { font-size: 11px; font-weight: 700; opacity: .75; margin-bottom: 2px; }
+.chat-name-input { flex: 1; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border); background: rgba(255, 255, 255, .06); color: var(--ink); outline: none; }
 .btn-primary {
   border: 0; border-radius: 10px; padding: 10px 16px;
   background: var(--accent); color: #fff; font-weight: 600;

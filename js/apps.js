@@ -34,6 +34,18 @@
     chatModel: { id: "Model AI:", en: "AI model:" },
     chatReplyLang: { id: "Bahasa balasan:", en: "Reply language:" },
     chatLangAuto: { id: "Ikuti bahasa UI", en: "Follow UI language" },
+    chatMultiRoom: { id: "Ruang:", en: "Room:" },
+    chatMultiName: { id: "Nama:", en: "Name:" },
+    chatMultiPlaceholder: { id: "Tulis pesan ke ruang ini...", en: "Write a message to this room..." },
+    chatMultiSend: { id: "Kirim", en: "Send" },
+    chatMultiCreate: { id: "Buat ruang", en: "Create room" },
+    chatMultiNewRoom: { id: "Nama ruang baru...", en: "New room name..." },
+    chatMultiRefresh: { id: "🔄 Segarkan", en: "🔄 Refresh" },
+    chatMultiGuest: { id: "Tamu", en: "Guest" },
+    chatMultiHint: { id: "Chat multi-user lewat server rutbhics — semua perangkat yang membuka server ini melihat pesan yang sama.", en: "Multi-user chat via the rutbhics server — every device opening this server sees the same messages." },
+    chatMultiOffline: { id: "Server tidak terjangkau. Jalankan `rutbhics` di satu perangkat, lalu buka alamat server itu dari perangkat lain.", en: "Server unreachable. Run `rutbhics` on one device, then open that server's address from other devices." },
+    chatMultiEmpty: { id: "Belum ada pesan di ruang ini.", en: "No messages in this room yet." },
+    chatMultiCreateFail: { id: "Gagal membuat ruang.", en: "Failed to create room." },
     chatSend: { id: "Kirim", en: "Send" },
     chatHintOff: { id: "Kontak ini menjawab pakai AI Larprouter bila server lokal rutbhics + .env sudah disiapkan.", en: "This contact replies with Larprouter AI once the local rutbhics server + .env are set up." },
     chatHintOn: { id: "AI aktif (model {model}).", en: "AI is active (model {model})." },
@@ -232,19 +244,179 @@
       try { localStorage.setItem("wd-chat-lang", langSelect.value); } catch (e) {}
     });
     langRow.appendChild(langLabel); langRow.appendChild(langSelect);
-    mainEl.appendChild(msgsEl); mainEl.appendChild(modelRow); mainEl.appendChild(langRow); mainEl.appendChild(inputRow); mainEl.appendChild(hintEl);
+    // ---------- Chat multi-user (ruang + pesan di server) ----------
+    // Pesan tinggal di server rutbhics (bukan localStorage perangkat),
+    // jadi semua perangkat yang membuka server yang sama melihat pesan
+    // yang sama. Tahap 1 tanpa akun server: nama adalah klaim perangkat
+    // (dari login desktop atau kolom nama). Pesan baru ditarik tiap 3
+    // detik; polling berhenti sendiri saat jendela Obrolan ditutup.
+    var multiEl = el('<div class="chat-multi"></div>');
+    var roomRow = el('<div class="chat-model-row"></div>');
+    var roomLabel = el('<span class="hint" style="margin:0"></span>');
+    roomLabel.textContent = tr("chatMultiRoom");
+    var roomSelect = document.createElement("select");
+    roomSelect.className = "chat-model";
+    var refreshBtn = el('<button class="chip"></button>');
+    refreshBtn.textContent = tr("chatMultiRefresh");
+    roomRow.appendChild(roomLabel); roomRow.appendChild(roomSelect); roomRow.appendChild(refreshBtn);
+    var nameRow = el('<div class="chat-model-row"></div>');
+    var nameLabel = el('<span class="hint" style="margin:0"></span>');
+    nameLabel.textContent = tr("chatMultiName");
+    var nameInput = el('<input type="text" class="chat-name-input">');
+    var multiName = "";
+    try { multiName = sessionStorage.getItem("wd-session") || localStorage.getItem("wd-chat-name") || ""; } catch (e) {}
+    if (!multiName) multiName = tr("chatMultiGuest");
+    nameInput.value = multiName;
+    nameInput.addEventListener("input", function () {
+      multiName = nameInput.value.trim() || tr("chatMultiGuest");
+      try { localStorage.setItem("wd-chat-name", multiName); } catch (e) {}
+    });
+    nameRow.appendChild(nameLabel); nameRow.appendChild(nameInput);
+    var multiMsgs = el('<div class="chat-msgs"></div>');
+    var multiInputRow = el('<div class="chat-input"></div>');
+    var multiInput = el('<input type="text" placeholder="' + tr("chatMultiPlaceholder") + '">');
+    var multiSend = el('<button class="btn-primary">' + tr("chatMultiSend") + '</button>');
+    multiInputRow.appendChild(multiInput); multiInputRow.appendChild(multiSend);
+    var createRow = el('<div class="chat-input"></div>');
+    var newRoomInput = el('<input type="text" placeholder="' + tr("chatMultiNewRoom") + '">');
+    var createBtn = el('<button class="btn-primary">' + tr("chatMultiCreate") + '</button>');
+    createRow.appendChild(newRoomInput); createRow.appendChild(createBtn);
+    var multiHint = el('<p class="hint"></p>');
+    multiHint.textContent = tr("chatMultiHint");
+    multiEl.appendChild(roomRow); multiEl.appendChild(nameRow); multiEl.appendChild(multiMsgs);
+    multiEl.appendChild(multiInputRow); multiEl.appendChild(createRow); multiEl.appendChild(multiHint);
+
+    var currentRoom = null;
+    var multiCache = [];
+    var lastSeq = 0;
+    var multiTimer = null;
+    function drawMultiMsg(m) {
+      var d = el('<div class="msg ' + (m.user === multiName ? "me" : "them") + '"></div>');
+      var n = el('<div class="msg-name"></div>');
+      n.textContent = m.user;
+      var t = el('<div class="msg-text"></div>');
+      t.textContent = m.text;
+      d.appendChild(n); d.appendChild(t);
+      multiMsgs.appendChild(d);
+      multiMsgs.scrollTop = multiMsgs.scrollHeight;
+    }
+    function fetchRooms() {
+      if (typeof fetch !== "function") { multiHint.textContent = tr("chatMultiOffline"); return; }
+      fetch("/api/rooms").then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); }).then(function (res) {
+        if (!res.ok || !res.body || !Array.isArray(res.body.rooms)) { multiHint.textContent = tr("chatMultiOffline"); return; }
+        var prev = currentRoom;
+        roomSelect.innerHTML = "";
+        res.body.rooms.forEach(function (rm) {
+          var o = document.createElement("option");
+          o.value = rm.id; o.textContent = rm.name;
+          roomSelect.appendChild(o);
+        });
+        currentRoom = res.body.rooms.some(function (rm) { return rm.id === prev; }) ? prev : (res.body.rooms[0] ? res.body.rooms[0].id : null);
+        if (currentRoom) roomSelect.value = currentRoom;
+        if (currentRoom !== prev) { multiCache = []; lastSeq = 0; multiMsgs.innerHTML = ""; fetchMulti(); }
+      }).catch(function () { multiHint.textContent = tr("chatMultiOffline"); });
+    }
+    function fetchMulti() {
+      if (!currentRoom || typeof fetch !== "function") return;
+      fetch("/api/rooms/" + encodeURIComponent(currentRoom) + "/messages?since=" + lastSeq)
+        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+        .then(function (res) {
+          if (!res.ok || !res.body || !Array.isArray(res.body.messages)) {
+            if (res.body && res.body.error === "ruang_tidak_ditemukan") { currentRoom = null; fetchRooms(); }
+            else multiHint.textContent = tr("chatMultiOffline");
+            return;
+          }
+          multiHint.textContent = "";
+          res.body.messages.forEach(function (m) {
+            if (m.seq <= lastSeq) return;
+            lastSeq = m.seq;
+            multiCache.push(m);
+            drawMultiMsg(m);
+          });
+          if (!multiCache.length) multiHint.textContent = tr("chatMultiEmpty");
+        })
+        .catch(function () { multiHint.textContent = tr("chatMultiOffline"); });
+    }
+    function ensureMultiPoll() {
+      if (multiTimer) return;
+      multiTimer = setInterval(function () {
+        try {
+          if (document.body && document.body.contains && !document.body.contains(mainEl)) {
+            clearInterval(multiTimer); multiTimer = null;
+            return;
+          }
+        } catch (e) {}
+        if (active !== "__multi__") return;
+        fetchMulti();
+      }, 3000);
+    }
+    function showPane() {
+      var multi = active === "__multi__";
+      msgsEl.style.display = multi ? "none" : "";
+      modelRow.style.display = multi ? "none" : "";
+      langRow.style.display = multi ? "none" : "";
+      inputRow.style.display = multi ? "none" : "";
+      hintEl.style.display = multi ? "none" : "";
+      multiEl.style.display = multi ? "" : "none";
+      if (multi) { ensureMultiPoll(); fetchRooms(); fetchMulti(); }
+    }
+    roomSelect.addEventListener("change", function () {
+      currentRoom = roomSelect.value || null;
+      multiCache = []; lastSeq = 0; multiMsgs.innerHTML = "";
+      fetchMulti();
+    });
+    refreshBtn.addEventListener("click", function () { fetchRooms(); fetchMulti(); });
+    function sendMulti() {
+      var text = multiInput.value.trim();
+      if (!text || !currentRoom) return;
+      var name = nameInput.value.trim() || tr("chatMultiGuest");
+      multiName = name;
+      try { localStorage.setItem("wd-chat-name", multiName); } catch (e) {}
+      fetch("/api/rooms/" + encodeURIComponent(currentRoom) + "/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user: multiName, text: text })
+      }).then(function (r) { return r.json(); }).then(function () {
+        multiInput.value = "";
+        fetchMulti();
+      }).catch(function () { multiHint.textContent = tr("chatMultiOffline"); });
+    }
+    multiSend.addEventListener("click", sendMulti);
+    multiInput.addEventListener("keydown", function (e) { if (e.key === "Enter") sendMulti(); });
+    createBtn.addEventListener("click", function () {
+      var name = newRoomInput.value.trim();
+      if (!name) return;
+      fetch("/api/rooms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name })
+      }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); }).then(function (res) {
+        if (!res.ok || !res.body || !res.body.room) { multiHint.textContent = tr("chatMultiCreateFail"); return; }
+        newRoomInput.value = "";
+        currentRoom = res.body.room.id;
+        multiCache = []; lastSeq = 0; multiMsgs.innerHTML = "";
+        fetchRooms();
+        fetchMulti();
+      }).catch(function () { multiHint.textContent = tr("chatMultiOffline"); });
+    });
+    newRoomInput.addEventListener("keydown", function (e) { if (e.key === "Enter") createBtn.click(); });
+    mainEl.appendChild(msgsEl); mainEl.appendChild(modelRow); mainEl.appendChild(langRow); mainEl.appendChild(inputRow); mainEl.appendChild(hintEl); mainEl.appendChild(multiEl);
     wrap.appendChild(listEl); wrap.appendChild(mainEl);
     body.appendChild(wrap);
 
     function drawContacts() {
       listEl.innerHTML = "";
+      var mb = el('<button class="chat-contact' + (active === "__multi__" ? " active" : "") + '">👥 Multi-User</button>');
+      mb.addEventListener("click", function () { active = "__multi__"; drawContacts(); showPane(); });
+      listEl.appendChild(mb);
       CONTACTS.forEach(function (c) {
         var b = el('<button class="chat-contact' + (c.id === active ? " active" : "") + '">' + c.name[langNow()] + "</button>");
-        b.addEventListener("click", function () { active = c.id; drawContacts(); drawMsgs(); });
+        b.addEventListener("click", function () { active = c.id; drawContacts(); drawMsgs(); showPane(); });
         listEl.appendChild(b);
       });
     }
     function drawMsgs() {
+      if (active === "__multi__") return;
       msgsEl.innerHTML = "";
       data[active].forEach(function (m) {
         var d = el('<div class="msg ' + (m.from === "me" ? "me" : "them") + '"></div>');
@@ -300,6 +472,7 @@
     input.addEventListener("keydown", function (e) { if (e.key === "Enter") sendMsg(); });
     drawContacts();
     drawMsgs();
+    showPane();
     // Status AI dari server lokal (diabaikan bila halaman dibuka statis).
     try {
       if (typeof fetch === "function") {

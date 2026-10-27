@@ -10,7 +10,12 @@
 //   persona masing-masing). Klien boleh menyertakan "model" di body untuk
 //   memilih model per percakapan; tanpa itu dipakai LARPROUTER_MODEL.
 //   GET /api/models — daftar model (live dari Larprouter bila kunci ada,
-//   kalau tidak daftar cadangan). Kunci API TIDAK PERNAH dikirim ke browser: kunci
+//   kalau tidak daftar cadangan).
+//   /api/rooms + /api/rooms/:id/messages — chat multi-user (ruang + pesan
+//   di berkas rutbhics-chat.json di folder kerja). Sengaja TIDAK dibatasi
+//   loopback: perangkat lain di jaringan harus bisa ikut. Tahap 1 tanpa
+//   akun server — nama pengirim adalah klaim perangkat.
+//   Kunci API TIDAK PERNAH dikirim ke browser: kunci
 //   dibaca server dari variabel lingkungan atau berkas .env lokal.
 //   Salin .env.example menjadi .env, isi LARPROUTER_API_KEY, lalu jalankan
 //   ulang. Berkas .env tidak pernah dilayani sebagai berkas statis dan
@@ -248,6 +253,88 @@ function handleModels(req, res) {
   up.end();
 }
 
+// ---------- Chat multi-user (ruang + pesan, via berkas JSON) ----------
+// Pesan tinggal di berkas rutbhics-chat.json di folder kerja (bertahan
+// saat server di-restart, tidak hilang saat package di-update). Batas:
+// 20 ruang, 500 pesan terakhir per ruang, nama 30 karakter, teks 2000.
+// Sengaja tanpa gate loopback (berbeda dengan /api/chat): perangkat lain
+// di jaringan harus bisa membaca/mengirim. Tahap 1 tanpa akun server.
+const CHAT_FILE = path.join(process.cwd(), "rutbhics-chat.json");
+let chatData = { rooms: [{ id: "umum", name: "Umum" }], messages: { umum: [] }, seq: 0 };
+try {
+  const raw = fs.readFileSync(CHAT_FILE, "utf8");
+  const parsed = JSON.parse(raw);
+  if (parsed && Array.isArray(parsed.rooms) && parsed.messages && typeof parsed.seq === "number") chatData = parsed;
+} catch (e) { /* mulai kosong */ }
+if (!chatData.rooms.some((r) => r.id === "umum")) chatData.rooms.unshift({ id: "umum", name: "Umum" });
+if (!Array.isArray(chatData.messages.umum)) chatData.messages.umum = [];
+function saveChat() {
+  try { fs.writeFileSync(CHAT_FILE, JSON.stringify(chatData)); } catch (e) { /* tetap jalan di memori */ }
+}
+function slugRoom(name) {
+  let s = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  if (!s) s = "ruang";
+  let id = s, i = 2;
+  while (chatData.rooms.some((r) => r.id === id)) { id = s + "-" + i; i += 1; }
+  return id;
+}
+function handleRooms(req, res) {
+  const url = new URL(req.url, "http://localhost");
+  const parts = url.pathname.split("/").filter(Boolean); // ["api","rooms",id?,"messages"?]
+  if (req.method === "GET" && parts.length === 2) {
+    sendJson(res, 200, { rooms: chatData.rooms });
+    return;
+  }
+  if (req.method === "POST" && parts.length === 2) {
+    readBody(req, 65536).then((raw) => {
+      let input;
+      try { input = JSON.parse(raw); } catch (e) { sendJson(res, 400, { error: "json_tidak_valid" }); return; }
+      const name = typeof input.name === "string" ? input.name.trim() : "";
+      if (!name || name.length > 50) { sendJson(res, 400, { error: "nama_ruang_tidak_valid" }); return; }
+      if (chatData.rooms.length >= 20) { sendJson(res, 400, { error: "ruang_penuh" }); return; }
+      const room = { id: slugRoom(name), name: name.slice(0, 50) };
+      chatData.rooms.push(room);
+      chatData.messages[room.id] = [];
+      saveChat();
+      sendJson(res, 200, { room });
+    }).catch(() => sendJson(res, 400, { error: "body_tidak_valid" }));
+    return;
+  }
+  if (parts.length === 4 && parts[3] === "messages") {
+    const roomId = decodeURIComponent(parts[2]);
+    if (!/^[a-z0-9-]{1,50}$/.test(roomId) || !chatData.messages[roomId]) {
+      sendJson(res, 404, { error: "ruang_tidak_ditemukan" });
+      return;
+    }
+    if (req.method === "GET") {
+      const since = parseInt(url.searchParams.get("since"), 10) || 0;
+      const msgs = chatData.messages[roomId].filter((m) => m.seq > since).slice(-200);
+      sendJson(res, 200, { messages: msgs, seq: chatData.seq });
+      return;
+    }
+    if (req.method === "POST") {
+      readBody(req, 65536).then((raw) => {
+        let input;
+        try { input = JSON.parse(raw); } catch (e) { sendJson(res, 400, { error: "json_tidak_valid" }); return; }
+        const user = typeof input.user === "string" ? input.user.trim() : "";
+        const text = typeof input.text === "string" ? input.text.trim() : "";
+        if (!user || user.length > 30 || !text || text.length > 2000) {
+          sendJson(res, 400, { error: "pesan_tidak_valid" });
+          return;
+        }
+        chatData.seq += 1;
+        const msg = { seq: chatData.seq, user: user.slice(0, 30), text: text.slice(0, 2000), time: Date.now() };
+        chatData.messages[roomId].push(msg);
+        if (chatData.messages[roomId].length > 500) chatData.messages[roomId] = chatData.messages[roomId].slice(-500);
+        saveChat();
+        sendJson(res, 200, { message: msg });
+      }).catch(() => sendJson(res, 400, { error: "body_tidak_valid" }));
+      return;
+    }
+  }
+  sendJson(res, 404, { error: "tidak_ditemukan" });
+}
+
 // Perintah setup mandiri: tanya kunci Larprouter, simpan ke .env folder
 // kerja (lokasi permanen yang tidak hilang saat package di-update), lalu
 // berhenti — server tidak dijalankan.
@@ -265,6 +352,7 @@ const server = http.createServer((req, res) => {
     const url = new URL(req.url, "http://localhost");
     if (url.pathname === "/api/chat") { handleChat(req, res); return; }
     if (url.pathname === "/api/models") { handleModels(req, res); return; }
+    if (url.pathname === "/api/rooms" || url.pathname.startsWith("/api/rooms/")) { handleRooms(req, res); return; }
     // Jangan pernah melayani dotfile (termasuk .env) sebagai berkas statis.
     if (url.pathname.startsWith("/.")) {
       res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
