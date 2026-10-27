@@ -69,6 +69,7 @@
       '<div class="win-header"><span>' + def.emoji + '</span>' +
       '<span class="win-title">' + def.title + '</span>' +
       '<button class="win-btn" data-act="min" title="Minimize">—</button>' +
+      '<button class="win-btn" data-act="max" title="Maximize">⛶</button>' +
       '<button class="win-btn close" data-act="close" title="Tutup">✕</button></div>' +
       '<div class="win-body"></div>';
     var body = w.querySelector(".win-body");
@@ -82,6 +83,12 @@
       delete openWins[id];
       renderTaskbar();
     });
+    w.querySelector('[data-act="max"]').addEventListener("click", function () {
+      toggleMax(w);
+      var btn = w.querySelector('[data-act="max"]');
+      btn.title = w._snapState === "max" ? "Restore" : "Maximize";
+      btn.textContent = w._snapState === "max" ? "❐" : "⛶";
+    });
     w.addEventListener("pointerdown", function () { focusWin(id); });
     makeDraggable(w, w.querySelector(".win-header"));
     windowsEl.appendChild(w);
@@ -91,13 +98,78 @@
     startMenu.classList.add("hidden");
   }
 
+  // ---------- Maximize + snap kiri/kanan (ala Windows) ----------
+  var TASKBAR_H = 52; // sama dengan tinggi #taskbar di CSS
+  function workArea() {
+    return { w: window.innerWidth, h: Math.max(0, window.innerHeight - TASKBAR_H) };
+  }
+  function saveRect(win) {
+    win._prevRect = {
+      left: win.style.left, top: win.style.top,
+      width: win.style.width, height: win.style.height
+    };
+  }
+  function restoreWin(win) {
+    var r = win._prevRect;
+    if (!r) return;
+    win.style.left = r.left; win.style.top = r.top;
+    win.style.width = r.width; win.style.height = r.height;
+    win._prevRect = null; win._snapState = null;
+    win.classList.remove("maximized");
+    win.classList.remove("snapped-left");
+    win.classList.remove("snapped-right");
+  }
+  function applyState(win, state) {
+    // Simpan rect asal hanya sekali: dari snap ke maximize (atau sebaliknya)
+    // restore tetap kembali ke ukuran/posisi semula, bukan ke keadaan snap.
+    if (!win._snapState) saveRect(win);
+    var a = workArea();
+    win._snapState = state;
+    win.classList.remove("maximized");
+    win.classList.remove("snapped-left");
+    win.classList.remove("snapped-right");
+    if (state === "max") {
+      win.classList.add("maximized");
+      win.style.left = "0px"; win.style.top = "0px";
+      win.style.width = a.w + "px"; win.style.height = a.h + "px";
+    } else {
+      win.classList.add(state === "left" ? "snapped-left" : "snapped-right");
+      win.style.left = (state === "left" ? 0 : Math.floor(a.w / 2)) + "px";
+      win.style.top = "0px";
+      win.style.width = Math.floor(a.w / 2) + "px";
+      win.style.height = a.h + "px";
+    }
+  }
+  function toggleMax(win) {
+    if (win._snapState === "max") restoreWin(win);
+    else applyState(win, "max");
+  }
+  // Jendela maximize/snap mengikuti ukuran layar saat window di-resize.
+  window.addEventListener("resize", function () {
+    Object.keys(openWins).forEach(function (id) {
+      var w = openWins[id];
+      if (w._snapState) applyState(w, w._snapState);
+    });
+  });
+
   function makeDraggable(win, handle) {
-    var dx = 0, dy = 0, dragging = false;
+    var dx = 0, dy = 0, dragging = false, startX = 0, startY = 0;
     handle.addEventListener("pointerdown", function (e) {
       if (e.target.closest(".win-btn")) return;
+      startX = e.clientX; startY = e.clientY;
+      // Jendela maximize/snap yang diseret: kembalikan dulu ke ukuran
+      // semula, lalu letakkan di bawah kursor (seperti Windows).
+      if (win._snapState) {
+        var pw = parseInt(win._prevRect.width, 10) || 640;
+        restoreWin(win);
+        win.style.left = Math.max(0, e.clientX - Math.floor(pw / 2)) + "px";
+        dx = Math.floor(pw / 2);
+        dy = e.clientY - win.offsetTop;
+      } else {
+        dx = e.clientX - win.offsetLeft;
+        dy = e.clientY - win.offsetTop;
+      }
       dragging = true;
-      dx = e.clientX - win.offsetLeft;
-      dy = e.clientY - win.offsetTop;
       handle.setPointerCapture(e.pointerId);
     });
     handle.addEventListener("pointermove", function (e) {
@@ -107,7 +179,21 @@
       win.style.left = x + "px";
       win.style.top = y + "px";
     });
-    handle.addEventListener("pointerup", function () { dragging = false; });
+    handle.addEventListener("pointerup", function (e) {
+      dragging = false;
+      if (!e) return;
+      // Snap hanya bila pointer benar-benar diseret (bukan klik biasa),
+      // dan dilepas dalam 8px dari tepi layar: kiri/kanan = setengah
+      // layar, atas = maximize.
+      if (Math.abs(e.clientX - startX) + Math.abs(e.clientY - startY) < 5) return;
+      if (e.clientX <= 8) applyState(win, "left");
+      else if (e.clientX >= window.innerWidth - 8) applyState(win, "right");
+      else if (e.clientY <= 8) applyState(win, "max");
+    });
+    handle.addEventListener("dblclick", function (e) {
+      if (e.target.closest(".win-btn")) return;
+      toggleMax(win);
+    });
   }
 
   // Ikon desktop + menu Start
