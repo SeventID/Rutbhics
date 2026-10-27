@@ -373,6 +373,17 @@ Perilaku:
 >   (jarang) — hapus lockfile manual. Multi-instance sejati tetap hanya
 >   mungkin lewat Tahap 2 SQLite.
 >
+> **Scrypt async (S8):** hash/check/dummy scrypt kini memakai
+>   `crypto.scrypt` async (threadpool libuv) — login/register tidak lagi
+>   memblokir event loop ~109ms; request lain (health, chat, rooms)
+>   tetap dilayani selagi hash berjalan. Parameter dan format TIDAK
+>   berubah (default N16384/r8/p1, keylen 64, `scrypt:<salt>:<hash>`)
+>   sehingga hash lama tetap terverifikasi dan latensi login ~100ms
+>   dipertahankan; dummy A2-02 ikut async agar jalur tak-dikenal tidak
+>   menjadi satu-satunya jalur yang masih memblokir loop. Pada login
+>   bersamaan, scrypt mengantre di threadpool (default 4) — tertunda,
+>   bukan memblokir loop.
+>
 > **PERINGATAN TEGAS:** `AI_ACCESS=local` yang disetel eksplisit TETAP
 > BERBAHAYA bila server diekspos lewat reverse proxy/domain publik —
 > kunci AI menjadi terbuka; operator yang mengekspos server WAJIB memakai

@@ -40,6 +40,7 @@ const https = require("node:https");
 const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
+const util = require("node:util");
 
 const ROOT = path.join(__dirname, "..");
 
@@ -1040,16 +1041,25 @@ pruneSessions(true);
 function saveUsers() {
   atomicSave(USERS_FILE, usersData);
 }
-function hashPassword(pw) {
+// Scrypt async (S8, A2-09): scryptSync memblokir event loop ~109ms per
+// login/register — selama itu SELURUH server macet (chat, rooms, health
+// ikut tertunda). crypto.scrypt async memakai threadpool libuv: loop
+// tetap melayani request lain selagi hash berjalan. Parameter dan format
+// TIDAK berubah: scrypt(pw, salt, 64) tanpa opsi (default N16384/r8/p1),
+// format "scrypt:<salt hex>:<hash hex>" — hash lama (scryptSync) tetap
+// terverifikasi byte-identik, dan latensi login ~100ms dipertahankan
+// (yang hilang hanya pemblokiran loop, bukan biaya scrypt).
+const scryptAsync = util.promisify(crypto.scrypt);
+async function hashPassword(pw) {
   const salt = crypto.randomBytes(16).toString("hex");
-  const hash = crypto.scryptSync(pw, salt, 64).toString("hex");
+  const hash = (await scryptAsync(pw, salt, 64)).toString("hex");
   return "scrypt:" + salt + ":" + hash;
 }
-function checkPassword(pw, stored) {
+async function checkPassword(pw, stored) {
   try {
     const parts = stored.split(":");
     if (parts.length !== 3 || parts[0] !== "scrypt") return false;
-    const hash = crypto.scryptSync(pw, parts[1], 64);
+    const hash = await scryptAsync(pw, parts[1], 64);
     const want = Buffer.from(parts[2], "hex");
     return hash.length === want.length && crypto.timingSafeEqual(hash, want);
   } catch (e) { return false; }
@@ -1059,9 +1069,11 @@ function checkPassword(pw, stored) {
 // jalur scrypt asli (~109ms). Input tetap, bukan password kiriman, agar
 // waktunya tidak bergantung pada input penyerang; hasil dibuang — bukan
 // hash yang disimpan atau dibandingkan. Parameter sama persis dengan
-// produksi: scryptSync(pw, salt, 64) tanpa opsi (default N16384/r8/p1).
-function dummyScrypt() {
-  crypto.scryptSync("rutbhics-dummy-password", "rutbhics-dummy-salt", 64);
+// produksi: scrypt(pw, salt, 64) async tanpa opsi (default N16384/r8/p1).
+// S8: dummy ikut async — dummy sync akan tetap memblokir loop pada
+// jalur tak-dikenal dan menggagalkan tujuan S8 tepat di jalur itu.
+async function dummyScrypt() {
+  await scryptAsync("rutbhics-dummy-password", "rutbhics-dummy-salt", 64);
 }
 function publicUser(u) {
   return { id: u.id, username: u.username, email: u.email || "", phone: u.phone || "", provider: u.provider || "local" };
@@ -1412,7 +1424,7 @@ function handleAuth(req, res) {
     return;
   }
   if (req.method === "POST" && action === "register" && parts.length === 3) {
-    readBody(req, 65536).then((raw) => {
+    readBody(req, 65536).then(async (raw) => {
       let input;
       try { input = JSON.parse(raw); } catch (e) { sendJson(res, 400, { error: "json_tidak_valid" }); return; }
       const username = typeof input.username === "string" ? input.username.trim() : "";
@@ -1433,11 +1445,11 @@ function handleAuth(req, res) {
         // A2-02: jalur baru menjalankan hashPassword (scrypt) — samakan
         // waktu 400 duplikat dengan scrypt dummy sebelum pesan generik.
         // Berjalan SETELAH pemeriksaan throttle register (429 tak berubah).
-        dummyScrypt();
+        await dummyScrypt();
         sendJson(res, 400, { error: "pendaftaran_gagal" });
         return;
       }
-      const user = { id: crypto.randomBytes(16).toString("hex"), username, email, phone, passHash: hashPassword(password), provider: "local", providerId: "", createdAt: Date.now() };
+      const user = { id: crypto.randomBytes(16).toString("hex"), username, email, phone, passHash: await hashPassword(password), provider: "local", providerId: "", createdAt: Date.now() };
       usersData.users.push(user);
       const token = createSession(user.id);
       setSessionCookie(res, token);
@@ -1448,7 +1460,7 @@ function handleAuth(req, res) {
   if (req.method === "POST" && action === "login" && parts.length === 3) {
     const ip = clientIp(req);
     if (loginBlocked(ip)) { sendJson(res, 429, { error: "terlalu_banyak_percobaan" }); return; }
-    readBody(req, 65536).then((raw) => {
+    readBody(req, 65536).then(async (raw) => {
       let input;
       try { input = JSON.parse(raw); } catch (e) { sendJson(res, 400, { error: "json_tidak_valid" }); return; }
       const identifier = typeof input.identifier === "string" ? input.identifier.trim() : "";
@@ -1460,14 +1472,16 @@ function handleAuth(req, res) {
         (u.phone && phoneId && u.phone === phoneId));
       const accountKey = user ? ("u:" + user.id) : ("i:" + identifier.toLowerCase());
       if (loginAccountBlocked(accountKey)) { sendJson(res, 429, { error: "terlalu_banyak_percobaan" }); return; }
-      if (!user || !user.passHash || !checkPassword(password, user.passHash)) {
+      let passOk = false;
+      if (user && user.passHash) passOk = await checkPassword(password, user.passHash);
+      if (!passOk) {
         // A2-02: checkPassword tidak berjalan bila pengguna tidak
         // ditemukan / tanpa passHash (short-circuit di atas) — jalankan
         // scrypt dummy agar 401 tak-dikenal setara waktunya dengan 401
         // salah password. Tanpa ini, selisih ~100ms membocorkan
         // eksistensi identifier. Berjalan SETELAH kedua pemeriksaan
         // throttle (429 tidak berubah waktunya).
-        if (!user || !user.passHash) dummyScrypt();
+        if (!user || !user.passHash) await dummyScrypt();
         noteLoginFail(ip);
         noteLoginAccountFail(accountKey);
         sendJson(res, 401, { error: "kredensial_salah" });
