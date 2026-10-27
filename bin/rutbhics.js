@@ -935,6 +935,19 @@ const server = http.createServer((req, res) => {
       res.end("Tidak ditemukan");
       return;
     }
+    // Jangan pernah melayani berkas data server sebagai berkas statis
+    // (P0-1): saat folder kerja == folder paket, berkas ini ada di ROOT
+    // dan bukan dotfile, jadi aturan dotfile saja tidak cukup. Aturan
+    // awalan juga menutupi .bak/.tmp-* dari persistensi atomik.
+    const BLOCKED_DATA = ["rutbhics-chat.json", "rutbhics-users.json", "config.json"];
+    let decodedPath = url.pathname;
+    try { decodedPath = decodeURIComponent(url.pathname); } catch (e) { /* pakai mentah */ }
+    const baseName = path.basename(decodedPath);
+    if (BLOCKED_DATA.some((n) => baseName === n || baseName.startsWith(n + "."))) {
+      res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+      res.end("Tidak ditemukan");
+      return;
+    }
     let filePath = path.normalize(path.join(ROOT, url.pathname));
     if (!filePath.startsWith(ROOT)) {
       res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });

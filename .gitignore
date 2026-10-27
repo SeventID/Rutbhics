@@ -1,2 +1,7 @@
 .env
 config.json
+rutbhics-chat.json
+rutbhics-users.json
+rutbhics-chat.json.bak
+rutbhics-users.json.bak
+rutbhics-*.tmp-*
