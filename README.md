@@ -272,3 +272,64 @@ Perilaku:
   `defaultModel`-nya digabungkan bila ada, kunci tetap dari env.
 - Saat start, server mencatat daftar id provider yang aktif (tanpa
   nilai kunci) di log.
+
+## 🚀 Deployment (VPS)
+
+Jalankan server di loopback, lalu ekspos lewat reverse proxy + HTTPS.
+Jangan membuka port aplikasi langsung ke internet.
+
+**systemd** (`/etc/systemd/system/rutbhics.service`):
+
+```ini
+[Unit]
+Description=Rutbhics web desktop
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/rutbhics
+ExecStart=/usr/bin/node bin/rutbhics.js --host 127.0.0.1 --port 8080
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Lalu `systemctl daemon-reload && systemctl enable --now rutbhics`.
+Berkas `.env` dibaca dari WorkingDirectory (jangan commit berkas ini).
+
+**Nginx** (cuplikan `server` HTTPS):
+
+```nginx
+location / {
+  proxy_pass http://127.0.0.1:8080;
+  proxy_http_version 1.1;
+  proxy_set_header Host $host;
+  proxy_set_header X-Real-IP $remote_addr;
+}
+```
+
+HTTPS: `certbot --nginx -d namadomain.example` (atau DNS-01 bila perlu).
+Untuk deployment publik, setel `OAUTH_REDIRECT_BASE=https://namadomain.example`
+di `.env` agar callback OAuth tidak bergantung pada header Host.
+
+**Backup** (rutin, ke lokasi di luar folder aplikasi):
+
+```sh
+cp rutbhics-users.json rutbhics-chat.json .env /var/backups/rutbhics/
+```
+
+Berkas `.bak` di folder yang sama adalah cadangan generasi terakhir bila
+berkas utama korup.
+
+**Health & log:**
+
+```sh
+curl https://namadomain.example/health   # -> {"ok":true}
+journalctl -u rutbhics -f
+```
+
+Catatan: throttle login/register memakai IP socket mentah dan TIDAK
+memercayai `X-Forwarded-For` (sengaja, agar tidak bisa dipalsukan) — di
+balik proxy bersama, semua pengguna berbagi satu anggaran throttle.

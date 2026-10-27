@@ -2,7 +2,7 @@
   "bin": {
     "rutbhics": "bin/rutbhics.js"
   },
-  "description": "Rutbhics — desktop komputer di dalam browser: window manager, taskbar, menu Start, dan aplikasi (Obrolan, Peramban, Files, Catatan, Kalkulator) + halaman login. Murni HTML/CSS/JavaScript vanilla, tanpa build step.",
+  "description": "Rutbhics — desktop komputer di dalam browser: window manager, taskbar, menu Start, dan 9 aplikasi (Obrolan, Peramban, Catatan, Kalkulator, Files, Pengaturan, Musik, Terminal, Gambar) + login server, chat multi-user, dan AI multi-provider (Larprouter). Murni HTML/CSS/JavaScript vanilla, tanpa build step.",
   "files": [
     "index.html",
     "login.html",
@@ -12,7 +12,8 @@
     "LICENSE",
     "bin/",
     "scripts/",
-    ".env.example"
+    ".env.example",
+    "config.example.json"
   ],
   "homepage": "https://github.com/SeventID/Rutbhics#readme",
   "license": "MIT",
@@ -26,5 +27,8 @@
     "postinstall": "node scripts/postinstall.js",
     "test": "node --check bin/rutbhics.js && node --check js/apps.js && node --check js/desktop.js && node --check scripts/postinstall.js && node --check scripts/setup-larprouter.js && node scripts/smoke.js"
   },
-  "version": "1.0.3"
+  "version": "1.0.3",
+  "engines": {
+    "node": ">=18"
+  }
 }

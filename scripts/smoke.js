@@ -83,6 +83,9 @@ async function main() {
       check((chat.status === 502 || chat.status === 503) && chat.body.includes("error"), "POST /api/chat tanpa kunci -> 502/503 jujur");
       const models = await req(port, "GET", "/api/models");
       check(models.status === 200, "GET /api/models -> 200");
+      let healthOk = false;
+      try { const h = await req(port, "GET", "/health"); healthOk = h.status === 200 && JSON.parse(h.body).ok === true; } catch (e) {}
+      check(healthOk, "GET /health -> 200 {ok:true}");
     } finally {
       try { child.kill(); } catch (e) {}
     }

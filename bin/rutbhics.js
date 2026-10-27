@@ -1097,6 +1097,9 @@ const server = http.createServer((req, res) => {
     const url = new URL(req.url, "http://localhost");
     if (url.pathname === "/api/chat") { handleChat(req, res); return; }
     if (url.pathname === "/api/models") { handleModels(req, res); return; }
+    // Health check terbuka (P2h): hanya {ok:true}, tanpa data apa pun.
+    // Sengaja TANPA gate loopback agar load balancer/monitor bisa memanggil.
+    if (url.pathname === "/health") { sendJson(res, 200, { ok: true }); return; }
     if (url.pathname === "/api/rooms" || url.pathname.startsWith("/api/rooms/")) { handleRooms(req, res); return; }
     if (url.pathname === "/api/auth" || url.pathname.startsWith("/api/auth/")) { handleAuth(req, res); return; }
     // Jangan pernah melayani dotfile (termasuk .env) sebagai berkas statis.
