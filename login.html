@@ -11,17 +11,17 @@
 <main class="login-page">
   <section class="login-card">
     <h1>🖥️ Rutbhics</h1>
-    <p class="sub">Masuk ke desktop.</p>
+    <p class="sub" id="login-sub">Masuk ke desktop.</p>
     <form id="login-form">
-      <label for="username">Nama pengguna</label>
+      <label for="username" id="label-user">Nama pengguna</label>
       <input id="username" type="text" autocomplete="username" required>
-      <label for="password">Kata sandi</label>
+      <label for="password" id="label-pass">Kata sandi</label>
       <input id="password" type="password" autocomplete="current-password" required>
       <p id="login-error" class="login-error"></p>
       <button id="login-btn" class="btn-primary" type="submit">Masuk</button>
     </form>
     <button id="reset-account" class="login-link hidden">Ganti akun perangkat (hapus akun ini)</button>
-    <p class="hint">Akun tersimpan lokal di perangkat ini (demo). Ini bukan autentikasi server sungguhan — siapa pun yang memegang berkasnya bisa melewatinya. Untuk autentikasi multi-pengguna sungguhan, perlu backend di tahap berikutnya.</p>
+    <p class="hint" id="login-hint">Akun tersimpan lokal di perangkat ini (demo). Ini bukan autentikasi server sungguhan — siapa pun yang memegang berkasnya bisa melewatinya. Untuk autentikasi multi-pengguna sungguhan, perlu backend di tahap berikutnya.</p>
   </section>
 </main>
 <script>
@@ -35,6 +35,36 @@
   var errEl = document.getElementById("login-error");
   var btn = document.getElementById("login-btn");
   var resetBtn = document.getElementById("reset-account");
+
+  // Bahasa halaman login mengikuti pilihan di desktop (localStorage
+  // "wd-lang"); halaman ini tidak memuat desktop.js jadi kamusnya
+  // sendiri di sini.
+  var lang = "id";
+  try { lang = localStorage.getItem("wd-lang") || "id"; } catch (e) {}
+  if (lang !== "id" && lang !== "en") lang = "id";
+  var T = {
+    title: { id: "Masuk — Rutbhics", en: "Sign in — Rutbhics" },
+    sub: { id: "Masuk ke desktop.", en: "Sign in to the desktop." },
+    user: { id: "Nama pengguna", en: "Username" },
+    pass: { id: "Kata sandi", en: "Password" },
+    signin: { id: "Masuk", en: "Sign in" },
+    create: { id: "Buat Akun & Masuk", en: "Create Account & Sign In" },
+    noAccount: { id: "Belum ada akun di perangkat ini — akun pertama yang dibuat menjadi akun perangkat ini.", en: "No account exists on this device yet — the first account created becomes this device's account." },
+    reset: { id: "Ganti akun perangkat (hapus akun ini)", en: "Switch device account (delete this account)" },
+    hint: { id: "Akun tersimpan lokal di perangkat ini (demo). Ini bukan autentikasi server sungguhan — siapa pun yang memegang berkasnya bisa melewatinya. Untuk autentikasi multi-pengguna sungguhan, perlu backend di tahap berikutnya.", en: "Accounts are stored locally on this device (demo). This is not real server authentication — anyone holding the files can bypass it. Real multi-user authentication needs a backend in a later stage." },
+    fillBoth: { id: "Isi nama pengguna dan kata sandi.", en: "Fill in username and password." },
+    saveFail: { id: "Gagal menyimpan akun di perangkat ini.", en: "Failed to save the account on this device." },
+    wrongCred: { id: "Nama pengguna atau kata sandi salah.", en: "Wrong username or password." }
+  };
+  function lt(key) { return (T[key] && T[key][lang]) || key; }
+  document.documentElement.lang = lang;
+  document.title = lt("title");
+  document.getElementById("login-sub").textContent = lt("sub");
+  document.getElementById("label-user").textContent = lt("user");
+  document.getElementById("label-pass").textContent = lt("pass");
+  document.getElementById("login-hint").textContent = lt("hint");
+  btn.textContent = lt("signin");
+  resetBtn.textContent = lt("reset");
 
   function loadUser() {
     try { return JSON.parse(localStorage.getItem(USER_KEY) || "null"); }
@@ -66,9 +96,8 @@
 
   var existing = loadUser();
   if (!existing) {
-    btn.textContent = "Buat Akun & Masuk";
-    document.querySelector(".login-card .sub").textContent =
-      "Belum ada akun di perangkat ini — akun pertama yang dibuat menjadi akun perangkat ini.";
+    btn.textContent = lt("create");
+    document.querySelector(".login-card .sub").textContent = lt("noAccount");
   } else {
     resetBtn.classList.remove("hidden");
     resetBtn.addEventListener("click", function () {
@@ -81,15 +110,15 @@
     e.preventDefault();
     var username = userEl.value.trim();
     var password = passEl.value;
-    if (!username || !password) { fail("Isi nama pengguna dan kata sandi."); return; }
+    if (!username || !password) { fail(lt("fillBoth")); return; }
     errEl.textContent = "";
     var saved = loadUser();
     hashPass(password).then(function (hash) {
       if (!saved) {
         try { localStorage.setItem(USER_KEY, JSON.stringify({ username: username, passHash: hash })); }
-        catch (err) { fail("Gagal menyimpan akun di perangkat ini."); return; }
+        catch (err) { fail(lt("saveFail")); return; }
       } else if (saved.username !== username || saved.passHash !== hash) {
-        fail("Nama pengguna atau kata sandi salah."); return;
+        fail(lt("wrongCred")); return;
       }
       try { sessionStorage.setItem(SESSION_KEY, username); } catch (err) {}
       location.href = "index.html";

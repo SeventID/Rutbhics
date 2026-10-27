@@ -18,37 +18,124 @@
     return t.firstElementChild;
   }
 
+  // ---------- Kamus isi aplikasi (Indonesia/Inggris) ----------
+  // Bahasa dibaca dari window.LANG (diatur desktop.js) atau
+  // localStorage "wd-lang". Teks aplikasi mengikuti bahasa saat
+  // aplikasi dibuka; Pengaturan merender ulang seketika saat bahasa
+  // diganti, aplikasi lain yang sudah terbuka perlu dibuka lagi.
+  function langNow() {
+    try {
+      var l = (typeof window !== "undefined" && window.LANG) || localStorage.getItem("wd-lang") || "id";
+      return l === "en" ? "en" : "id";
+    } catch (e) { return "id"; }
+  }
+  var TR = {
+    chatPlaceholder: { id: "Tulis pesan...", en: "Write a message..." },
+    chatSend: { id: "Kirim", en: "Send" },
+    chatHintOff: { id: "Kontak ini menjawab pakai AI Larprouter bila server lokal rutbhics + .env sudah disiapkan.", en: "This contact replies with Larprouter AI once the local rutbhics server + .env are set up." },
+    chatHintOn: { id: "AI aktif (model {model}).", en: "AI is active (model {model})." },
+    chatHintSetup: { id: "AI belum aktif — isi LARPROUTER_API_KEY di .env, lalu jalankan ulang rutbhics.", en: "AI is not active yet — put LARPROUTER_API_KEY in .env, then restart rutbhics." },
+    chatNoFetch: { id: "Browser ini tidak mendukung fetch, jadi AI tidak bisa dihubungi.", en: "This browser does not support fetch, so the AI cannot be reached." },
+    chatAiInactive: { id: "AI belum aktif: isi LARPROUTER_API_KEY di berkas .env (salin dari .env.example), lalu jalankan ulang rutbhics.", en: "AI is not active: put LARPROUTER_API_KEY in the .env file (copy from .env.example), then restart rutbhics." },
+    chatAiFail: { id: "AI gagal: ", en: "AI failed: " },
+    chatAiUnreach: { id: "AI gagal dihubungi (status {status}). Coba lagi nanti.", en: "AI could not be reached (status {status}). Try again later." },
+    chatAiLocalOnly: { id: "AI hanya jalan lewat server lokal rutbhics (bukan halaman statis). Jalankan `rutbhics` di perangkat ini, pastikan .env sudah diisi, lalu buka lagi.", en: "AI only runs through the local rutbhics server (not a static page). Run `rutbhics` on this device, make sure .env is filled in, then reopen." },
+    browserPlaceholder: { id: "Ketik alamat situs, mis. wikipedia.org", en: "Type a site address, e.g. wikipedia.org" },
+    browserGo: { id: "Kunjungi", en: "Visit" },
+    browserHint: { id: "Catatan: banyak situs besar (Google, YouTube, dll.) memblokir tampil di dalam frame, jadi halaman bisa tampak kosong. Itu batasan teknis browser, bukan bug aplikasi ini.", en: "Note: many big sites (Google, YouTube, etc.) block being shown inside a frame, so the page may look empty. That is a browser limitation, not a bug in this app." },
+    notesPlaceholder: { id: "Tulis catatanmu di sini...", en: "Write your notes here..." },
+    notesSave: { id: "Simpan", en: "Save" },
+    notesSaved: { id: "Tersimpan ✓", en: "Saved ✓" },
+    filesUp: { id: "↑ Naik", en: "↑ Up" },
+    filesNewFolder: { id: "Folder Baru", en: "New Folder" },
+    filesNewFile: { id: "Berkas Baru", en: "New File" },
+    filesEmpty: { id: "Folder ini kosong. Buat folder atau berkas baru dari tombol di atas.", en: "This folder is empty. Create a new folder or file with the buttons above." },
+    filesDelete: { id: "Hapus", en: "Delete" },
+    filesSave: { id: "Simpan", en: "Save" },
+    filesSaved: { id: "Tersimpan ✓", en: "Saved ✓" },
+    filesNewFolderName: { id: "Folder baru", en: "New folder" },
+    filesNewFileName: { id: "Berkas baru.txt", en: "New file.txt" },
+    settingsTitle: { id: "Personalisasi desktop", en: "Personalize desktop" },
+    settingsWallpaper: { id: "Wallpaper", en: "Wallpaper" },
+    settingsTheme: { id: "Tema", en: "Theme" },
+    settingsDark: { id: "🌙 Gelap", en: "🌙 Dark" },
+    settingsLight: { id: "☀️ Terang", en: "☀️ Light" },
+    settingsReset: { id: "Kembalikan bawaan", en: "Restore defaults" },
+    settingsHint: { id: "Pengaturan tersimpan di perangkat ini dan langsung diterapkan saat desktop dibuka lagi.", en: "Settings are saved on this device and applied again when the desktop is reopened." },
+    musicPlay: { id: "▶ Putar", en: "▶ Play" },
+    musicPause: { id: "⏸ Jeda", en: "⏸ Pause" },
+    musicVolume: { id: "Volume", en: "Volume" },
+    musicAddPlaceholder: { id: "Tempel URL audio/video, mis. https://.../lagu.mp3", en: "Paste an audio/video URL, e.g. https://.../song.mp3" },
+    musicAdd: { id: "Tambah", en: "Add" },
+    musicDelete: { id: "Hapus", en: "Delete" },
+    musicHint: { id: "Trek demo butuh internet. Trek tambahan tersimpan di perangkat ini.", en: "Demo tracks need internet. Extra tracks are saved on this device." },
+    musicLoadError: { id: "Gagal memuat media ini. Periksa URL atau koneksi internet, lalu coba trek lain.", en: "Failed to load this media. Check the URL or internet connection, then try another track." },
+    termPlaceholder: { id: "Ketik help untuk daftar perintah...", en: "Type help for a list of commands..." },
+    termHint: { id: "Perintah semu saja — terminal ini tidak menjalankan program di perangkat.", en: "Pseudo-commands only — this terminal does not run programs on the device." },
+    termWelcome: { id: "Selamat datang di Terminal Rutbhics! Ketik help untuk daftar perintah.", en: "Welcome to the Rutbhics Terminal! Type help for a list of commands." },
+    termHelpTitle: { id: "Perintah yang tersedia:", en: "Available commands:" },
+    termHelpHelp: { id: "  help   - tampilkan daftar perintah ini", en: "  help   - show this list of commands" },
+    termHelpAbout: { id: "  about  - tentang Rutbhics", en: "  about  - about Rutbhics" },
+    termHelpEcho: { id: "  echo   - tampilkan teks, mis. echo halo", en: "  echo   - print text, e.g. echo hello" },
+    termHelpDate: { id: "  date   - tanggal & jam sekarang (WIB)", en: "  date   - current date & time (WIB)" },
+    termHelpClear: { id: "  clear  - bersihkan layar terminal", en: "  clear  - clear the terminal screen" },
+    termAbout1: { id: "Rutbhics — desktop komputer di dalam browser.", en: "Rutbhics — a computer desktop inside the browser." },
+    termAbout2: { id: "Dibangun dengan HTML, CSS, dan JavaScript murni, tanpa framework.", en: "Built with pure HTML, CSS, and JavaScript, no frameworks." },
+    termAbout3: { id: "Terminal ini hanya perintah semu: tidak menjalankan program atau mengakses berkas sistem.", en: "This terminal only has pseudo-commands: it does not run programs or access system files." },
+    termNotFound: { id: "perintah tidak ditemukan: {name} — ketik help untuk daftar perintah.", en: "command not found: {name} — type help for a list of commands." },
+    gambarEraser: { id: "🧽 Penghapus", en: "🧽 Eraser" },
+    gambarThin: { id: "Tipis", en: "Thin" },
+    gambarMedium: { id: "Sedang", en: "Medium" },
+    gambarThick: { id: "Tebal", en: "Thick" },
+    gambarClear: { id: "🗑 Hapus", en: "🗑 Clear" },
+    gambarDownload: { id: "⬇ Unduh PNG", en: "⬇ Download PNG" },
+    gambarAutoSave: { id: "Gambar tersimpan otomatis di perangkat ini.", en: "Drawings save automatically on this device." },
+    gambarCleared: { id: "Kanvas dibersihkan dan tersimpan ✓", en: "Canvas cleared and saved ✓" },
+    gambarSaved: { id: "Tersimpan ✓ (otomatis di perangkat ini)", en: "Saved ✓ (automatically on this device)" }
+  };
+  function tr(key) {
+    var d = TR[key];
+    return (d && d[langNow()]) || key;
+  }
+
   // ---------- Obrolan (gaya WhatsApp, demo lokal) ----------
   var CONTACTS = [
-    { id: "teman", name: "Teman", hello: "Hai! Lagi ngapain?" },
-    { id: "grup", name: "Grup Keluarga", hello: "Selamat datang di grup keluarga!" },
-    { id: "bot", name: "Bot Asisten", hello: "Halo! Aku Bot Asisten Rutbhics. Tulis pesan, nanti aku balas." }
+    { id: "teman", name: { id: "Teman", en: "Friend" }, hello: { id: "Hai! Lagi ngapain?", en: "Hey! What are you up to?" } },
+    { id: "grup", name: { id: "Grup Keluarga", en: "Family Group" }, hello: { id: "Selamat datang di grup keluarga!", en: "Welcome to the family group!" } },
+    { id: "bot", name: { id: "Bot Asisten", en: "Assistant Bot" }, hello: { id: "Halo! Aku Bot Asisten Rutbhics. Tulis pesan, nanti aku balas.", en: "Hi! I'm the Rutbhics Assistant Bot. Write a message and I'll reply." } }
   ];
   // Persona AI per kontak Obrolan (dikirim sebagai system prompt ke /api/chat).
   // Catatan jujur: Teman & Grup Keluarga tetap BUKAN orang sungguhan — mereka
   // adalah persona AI. Chat antar pengguna beneran butuh backend server
   // (tahap berikutnya, belum dikerjakan).
   var PERSONAS = {
-    teman: "Kamu adalah Teman, teman akrab pengguna di aplikasi chat Rutbhics. Jawab santai seperti teman mengobrol, singkat, dan dalam Bahasa Indonesia.",
-    grup: "Kamu adalah anggota Grup Keluarga di aplikasi chat Rutbhics. Jawab hangat seperti anggota keluarga yang mengobrol di grup, singkat, dan dalam Bahasa Indonesia.",
-    bot: "Kamu adalah Bot Asisten di desktop Rutbhics. Jawab singkat, jelas, dan dalam Bahasa Indonesia."
+    id: {
+      teman: "Kamu adalah Teman, teman akrab pengguna di aplikasi chat Rutbhics. Jawab santai seperti teman mengobrol, singkat, dan dalam Bahasa Indonesia.",
+      grup: "Kamu adalah anggota Grup Keluarga di aplikasi chat Rutbhics. Jawab hangat seperti anggota keluarga yang mengobrol di grup, singkat, dan dalam Bahasa Indonesia.",
+      bot: "Kamu adalah Bot Asisten di desktop Rutbhics. Jawab singkat, jelas, dan dalam Bahasa Indonesia."
+    },
+    en: {
+      teman: "You are Teman, the user's close friend in the Rutbhics chat app. Reply casually like a friend chatting, briefly, and in English.",
+      grup: "You are a member of the Family Group in the Rutbhics chat app. Reply warmly like a family member chatting in the group, briefly, and in English.",
+      bot: "You are the Assistant Bot on the Rutbhics desktop. Reply briefly, clearly, and in English."
+    }
   };
   function renderChat(body) {
     var data = store("wd-chat", {});
-    CONTACTS.forEach(function (c) { if (!data[c.id]) data[c.id] = [{ from: "them", text: c.hello }]; });
+    CONTACTS.forEach(function (c) { if (!data[c.id]) data[c.id] = [{ from: "them", text: c.hello[langNow()] }]; });
     var active = CONTACTS[0].id;
     var wrap = el('<div class="chat-wrap"></div>');
     var listEl = el('<div class="chat-contacts"></div>');
     var mainEl = el('<div class="chat-main"></div>');
     var msgsEl = el('<div class="chat-msgs"></div>');
     var inputRow = el('<div class="chat-input"></div>');
-    var input = el('<input type="text" placeholder="Tulis pesan...">');
-    var send = el('<button class="btn-primary">Kirim</button>');
+    var input = el('<input type="text" placeholder="' + tr("chatPlaceholder") + '">');
+    var send = el('<button class="btn-primary">' + tr("chatSend") + '</button>');
     inputRow.appendChild(input); inputRow.appendChild(send);
     // Hint status AI (semua kontak Obrolan memakai AI Larprouter).
     // Kunci API tidak pernah ada di browser: browser hanya memanggil
     // /api/chat di server lokal, kunci dibaca server dari .env.
-    var botHint = "Kontak ini menjawab pakai AI Larprouter bila server lokal rutbhics + .env sudah disiapkan.";
+    var botHint = tr("chatHintOff");
     var hintEl = el('<p class="hint bot-hint"></p>');
     mainEl.appendChild(msgsEl); mainEl.appendChild(inputRow); mainEl.appendChild(hintEl);
     wrap.appendChild(listEl); wrap.appendChild(mainEl);
@@ -57,7 +144,7 @@
     function drawContacts() {
       listEl.innerHTML = "";
       CONTACTS.forEach(function (c) {
-        var b = el('<button class="chat-contact' + (c.id === active ? " active" : "") + '">' + c.name + "</button>");
+        var b = el('<button class="chat-contact' + (c.id === active ? " active" : "") + '">' + c.name[langNow()] + "</button>");
         b.addEventListener("click", function () { active = c.id; drawContacts(); drawMsgs(); });
         listEl.appendChild(b);
       });
@@ -85,24 +172,24 @@
         return { role: m.from === "me" ? "user" : "assistant", content: m.text };
       });
       if (typeof fetch !== "function") {
-        pushAI("Browser ini tidak mendukung fetch, jadi AI tidak bisa dihubungi.");
+        pushAI(tr("chatNoFetch"));
         return;
       }
       fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: history, system: PERSONAS[active] })
+        body: JSON.stringify({ messages: history, system: PERSONAS[langNow()][active] })
       }).then(function (r) {
         return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; });
       }).then(function (res) {
         if (res.ok && res.body && res.body.reply) { pushAI(res.body.reply); }
         else if (res.body && res.body.error === "bot_ai_tidak_aktif") {
-          pushAI("AI belum aktif: isi LARPROUTER_API_KEY di berkas .env (salin dari .env.example), lalu jalankan ulang rutbhics.");
+          pushAI(tr("chatAiInactive"));
         }
-        else if (res.body && res.body.message) { pushAI("AI gagal: " + res.body.message); }
-        else { pushAI("AI gagal dihubungi (status " + res.status + "). Coba lagi nanti."); }
+        else if (res.body && res.body.message) { pushAI(tr("chatAiFail") + res.body.message); }
+        else { pushAI(tr("chatAiUnreach").replace("{status}", res.status)); }
       }).catch(function () {
-        pushAI("AI hanya jalan lewat server lokal rutbhics (bukan halaman statis). Jalankan `rutbhics` di perangkat ini, pastikan .env sudah diisi, lalu buka lagi.");
+        pushAI(tr("chatAiLocalOnly"));
       });
     }
     function sendMsg() {
@@ -122,8 +209,8 @@
     try {
       if (typeof fetch === "function") {
         fetch("/api/chat").then(function (r) { return r.json(); }).then(function (s) {
-          if (s && s.active) botHint = "AI aktif (model " + s.model + ").";
-          else botHint = "AI belum aktif — isi LARPROUTER_API_KEY di .env, lalu jalankan ulang rutbhics.";
+          if (s && s.active) botHint = tr("chatHintOn").replace("{model}", s.model);
+          else botHint = tr("chatHintSetup");
           drawMsgs();
         }).catch(function () { /* tetap pakai hint bawaan */ });
       }
@@ -133,8 +220,8 @@
   // ---------- Peramban ----------
   function renderBrowser(body) {
     var bar = el('<div class="browser-bar"></div>');
-    var input = el('<input type="text" placeholder="Ketik alamat situs, mis. wikipedia.org">');
-    var go = el('<button class="btn-primary">Kunjungi</button>');
+    var input = el('<input type="text" placeholder="' + tr("browserPlaceholder") + '">');
+    var go = el('<button class="btn-primary">' + tr("browserGo") + '</button>');
     bar.appendChild(input); bar.appendChild(go);
     var links = el('<div class="quick-links"></div>');
     ["wikipedia.org", "openstreetmap.org", "example.com"].forEach(function (u) {
@@ -143,7 +230,8 @@
       links.appendChild(c);
     });
     var frame = el('<iframe class="browser-frame" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>');
-    var hint = el('<p class="hint">Catatan: banyak situs besar (Google, YouTube, dll.) memblokir tampil di dalam frame, jadi halaman bisa tampak kosong. Itu batasan teknis browser, bukan bug aplikasi ini.</p>');
+    var hint = el('<p class="hint"></p>');
+    hint.textContent = tr("browserHint");
     body.appendChild(bar); body.appendChild(links); body.appendChild(frame); body.appendChild(hint);
     function openUrl(raw) {
       var u = raw.trim();
@@ -162,13 +250,13 @@
 
   // ---------- Catatan ----------
   function renderNotes(body) {
-    var area = el('<textarea class="notes-area" placeholder="Tulis catatanmu di sini..."></textarea>');
+    var area = el('<textarea class="notes-area" placeholder="' + tr("notesPlaceholder") + '"></textarea>');
     area.value = store("wd-notes", "");
-    var btn = el('<button class="btn-primary" style="margin-top:10px">Simpan</button>');
+    var btn = el('<button class="btn-primary" style="margin-top:10px">' + tr("notesSave") + '</button>');
     var ok = el('<span class="hint" style="margin-left:10px"></span>');
     btn.addEventListener("click", function () {
       save("wd-notes", area.value);
-      ok.textContent = "Tersimpan ✓";
+      ok.textContent = tr("notesSaved");
       setTimeout(function () { ok.textContent = ""; }, 2000);
     });
     body.appendChild(area); body.appendChild(btn); body.appendChild(ok);
@@ -215,16 +303,17 @@
   // ---------- Files (penjelajah berkas virtual, data lokal) ----------
   // Struktur: { name, type: "folder"|"file", children: [], content: "" }
   function defaultFS() {
+    var en = langNow() === "en";
     return {
       name: "", type: "folder", children: [
-        { name: "Dokumen", type: "folder", children: [
-          { name: "Selamat datang.txt", type: "file",
-            content: "Selamat datang di Files Rutbhics!\n\nIni penjelajah berkas virtual: folder dan berkas teks yang kamu buat tersimpan di perangkat ini (localStorage), jadi tetap ada saat halaman dibuka lagi.\n\nCoba: buat folder baru, buat berkas baru, buka berkas untuk mengedit isinya, atau hapus yang tidak perlu." },
-          { name: "Tentang Rutbhics.txt", type: "file",
-            content: "Rutbhics adalah aplikasi desktop di dalam browser.\nDibangun dengan HTML, CSS, dan JavaScript murni — tanpa framework." }
+        { name: en ? "Documents" : "Dokumen", type: "folder", children: [
+          { name: en ? "Welcome.txt" : "Selamat datang.txt", type: "file",
+            content: en ? "Welcome to Rutbhics Files!\n\nThis is a virtual file explorer: folders and text files you create are saved on this device (localStorage), so they stay when the page is reopened.\n\nTry: create a new folder, create a new file, open a file to edit its contents, or delete what you don't need." : "Selamat datang di Files Rutbhics!\n\nIni penjelajah berkas virtual: folder dan berkas teks yang kamu buat tersimpan di perangkat ini (localStorage), jadi tetap ada saat halaman dibuka lagi.\n\nCoba: buat folder baru, buat berkas baru, buka berkas untuk mengedit isinya, atau hapus yang tidak perlu." },
+          { name: en ? "About Rutbhics.txt" : "Tentang Rutbhics.txt", type: "file",
+            content: en ? "Rutbhics is a desktop app inside the browser.\nBuilt with pure HTML, CSS, and JavaScript — no frameworks." : "Rutbhics adalah aplikasi desktop di dalam browser.\nDibangun dengan HTML, CSS, dan JavaScript murni — tanpa framework." }
         ]},
-        { name: "Gambar", type: "folder", children: [] },
-        { name: "Musik", type: "folder", children: [] }
+        { name: en ? "Pictures" : "Gambar", type: "folder", children: [] },
+        { name: en ? "Music" : "Musik", type: "folder", children: [] }
       ]
     };
   }
@@ -235,9 +324,9 @@
     var path = []; // array nama folder dari root
     var bar = el('<div class="files-bar"></div>');
     var pathEl = el('<span class="files-path">/</span>');
-    var upBtn = el('<button class="chip">↑ Naik</button>');
-    var newFolderBtn = el('<button class="btn-primary">Folder Baru</button>');
-    var newFileBtn = el('<button class="btn-primary">Berkas Baru</button>');
+    var upBtn = el('<button class="chip">' + tr("filesUp") + '</button>');
+    var newFolderBtn = el('<button class="btn-primary">' + tr("filesNewFolder") + '</button>');
+    var newFileBtn = el('<button class="btn-primary">' + tr("filesNewFile") + '</button>');
     bar.appendChild(pathEl); bar.appendChild(upBtn);
     bar.appendChild(newFolderBtn); bar.appendChild(newFileBtn);
     var listEl = el('<div class="files-list"></div>');
@@ -270,7 +359,8 @@
       listEl.innerHTML = "";
       viewEl.innerHTML = "";
       if (!folder.children.length) {
-        var empty = el('<p class="hint">Folder ini kosong. Buat folder atau berkas baru dari tombol di atas.</p>');
+        var empty = el('<p class="hint"></p>');
+        empty.textContent = tr("filesEmpty");
         listEl.appendChild(empty);
         return;
       }
@@ -281,7 +371,7 @@
         var nameBtn = el('<button class="file-name"></button>');
         nameBtn.textContent = item.name;
         nameBtn.addEventListener("click", function () { openItem(item); });
-        var del = el('<button class="chip">Hapus</button>');
+        var del = el('<button class="chip">' + tr("filesDelete") + '</button>');
         del.addEventListener("click", function () {
           folder.children = folder.children.filter(function (c) { return c !== item; });
           persist(); draw();
@@ -297,11 +387,11 @@
       title.textContent = item.name;
       var area = el('<textarea class="files-editor"></textarea>');
       area.value = item.content || "";
-      var saveBtn = el('<button class="btn-primary">Simpan</button>');
+      var saveBtn = el('<button class="btn-primary">' + tr("filesSave") + '</button>');
       var ok = el('<span class="hint" style="margin-left:10px"></span>');
       saveBtn.addEventListener("click", function () {
         item.content = area.value; persist();
-        ok.textContent = "Tersimpan ✓";
+        ok.textContent = tr("filesSaved");
         setTimeout(function () { ok.textContent = ""; }, 2000);
       });
       viewEl.appendChild(title); viewEl.appendChild(area);
@@ -312,13 +402,13 @@
     });
     newFolderBtn.addEventListener("click", function () {
       var folder = currentFolder();
-      var name = uniqueName("Folder baru", folder);
+      var name = uniqueName(tr("filesNewFolderName"), folder);
       folder.children.push({ name: name, type: "folder", children: [] });
       persist(); draw();
     });
     newFileBtn.addEventListener("click", function () {
       var folder = currentFolder();
-      var name = uniqueName("Berkas baru.txt", folder);
+      var name = uniqueName(tr("filesNewFileName"), folder);
       folder.children.push({ name: name, type: "file", content: "" });
       persist(); draw();
     });
@@ -329,13 +419,13 @@
   // Kunci wd-wallpaper / wd-theme disimpan sebagai string mentah (bukan JSON),
   // supaya desktop.js bisa membacanya langsung dengan getItem.
   var WALLPAPERS = {
-    malam: { name: "Ungu Malam",
+    malam: { name: { id: "Ungu Malam", en: "Purple Night" },
       bg: "radial-gradient(600px 400px at 20% 15%, rgba(99, 102, 241, .45), transparent 60%), radial-gradient(700px 500px at 85% 80%, rgba(34, 211, 238, .30), transparent 60%), linear-gradient(160deg, #0f172a, #1e1b4b 55%, #0b1120)" },
-    senja: { name: "Senja Jingga",
+    senja: { name: { id: "Senja Jingga", en: "Orange Dusk" },
       bg: "radial-gradient(600px 400px at 20% 15%, rgba(251, 146, 60, .45), transparent 60%), radial-gradient(700px 500px at 85% 80%, rgba(244, 63, 94, .30), transparent 60%), linear-gradient(160deg, #431407, #7c2d12 55%, #1c1917)" },
-    hutan: { name: "Hutan Hijau",
+    hutan: { name: { id: "Hutan Hijau", en: "Green Forest" },
       bg: "radial-gradient(600px 400px at 20% 15%, rgba(52, 211, 153, .40), transparent 60%), radial-gradient(700px 500px at 85% 80%, rgba(163, 230, 53, .25), transparent 60%), linear-gradient(160deg, #052e16, #14532d 55%, #022c22)" },
-    laut: { name: "Laut Biru",
+    laut: { name: { id: "Laut Biru", en: "Blue Sea" },
       bg: "radial-gradient(600px 400px at 20% 15%, rgba(56, 189, 248, .45), transparent 60%), radial-gradient(700px 500px at 85% 80%, rgba(45, 212, 191, .30), transparent 60%), linear-gradient(160deg, #082f49, #0c4a6e 55%, #020617)" }
   };
   window.WALLPAPERS = WALLPAPERS;
@@ -355,15 +445,15 @@
     } catch (e) {}
     if (!WALLPAPERS[curWp]) curWp = "malam";
 
-    body.appendChild(el('<h3 class="settings-title">Personalisasi desktop</h3>'));
-    body.appendChild(el('<p class="settings-head">Wallpaper</p>'));
+    body.appendChild(el('<h3 class="settings-title">' + tr("settingsTitle") + '</h3>'));
+    body.appendChild(el('<p class="settings-head">' + tr("settingsWallpaper") + '</p>'));
     var grid = el('<div class="wp-grid"></div>');
     Object.keys(WALLPAPERS).forEach(function (id) {
       var b = el('<button class="wp-swatch' + (id === curWp ? " active" : "") + '"></button>');
       b.style.background = WALLPAPERS[id].bg;
-      b.title = WALLPAPERS[id].name;
+      b.title = WALLPAPERS[id].name[langNow()];
       var lbl = el('<span class="wp-label"></span>');
-      lbl.textContent = WALLPAPERS[id].name;
+      lbl.textContent = WALLPAPERS[id].name[langNow()];
       b.appendChild(lbl);
       b.addEventListener("click", function () {
         curWp = id;
@@ -376,10 +466,10 @@
     });
     body.appendChild(grid);
 
-    body.appendChild(el('<p class="settings-head">Tema</p>'));
+    body.appendChild(el('<p class="settings-head">' + tr("settingsTheme") + '</p>'));
     var row = el('<div class="theme-row"></div>');
-    var darkBtn = el('<button class="chip theme-btn' + (curTheme === "dark" ? " active" : "") + '">🌙 Gelap</button>');
-    var lightBtn = el('<button class="chip theme-btn' + (curTheme === "light" ? " active" : "") + '">☀️ Terang</button>');
+    var darkBtn = el('<button class="chip theme-btn' + (curTheme === "dark" ? " active" : "") + '">' + tr("settingsDark") + '</button>');
+    var lightBtn = el('<button class="chip theme-btn' + (curTheme === "light" ? " active" : "") + '">' + tr("settingsLight") + '</button>');
     function setTheme(t) {
       curTheme = t;
       try { localStorage.setItem("wd-theme", t); } catch (e) {}
@@ -392,10 +482,10 @@
     row.appendChild(darkBtn); row.appendChild(lightBtn);
     body.appendChild(row);
 
-    // Bahasa shell desktop (Indonesia/Inggris, tersimpan lokal).
-    // Diterapkan langsung oleh desktop.js (window.setLang); label
-    // Pengaturan sendiri tidak ikut berubah karena panel ini sudah
-    // dirender — buka lagi panelnya untuk melihat label baru.
+    // Bahasa (Indonesia/Inggris, tersimpan lokal). Diterapkan oleh
+    // desktop.js (window.setLang); panel ini dirender ulang seketika
+    // dalam bahasa baru, aplikasi lain yang sudah terbuka perlu
+    // dibuka lagi.
     body.appendChild(el('<p class="settings-head">Bahasa / Language</p>'));
     var langRow = el('<div class="theme-row"></div>');
     var curLang = "id";
@@ -407,13 +497,15 @@
       if (typeof window.setLang === "function") window.setLang(l);
       idBtn.classList.toggle("active", l === "id");
       enBtn.classList.toggle("active", l === "en");
+      body.innerHTML = "";
+      renderSettings(body);
     }
     idBtn.addEventListener("click", function () { setLangUI("id"); });
     enBtn.addEventListener("click", function () { setLangUI("en"); });
     langRow.appendChild(idBtn); langRow.appendChild(enBtn);
     body.appendChild(langRow);
 
-    var reset = el('<button class="btn-primary" style="margin-top:18px">Kembalikan bawaan</button>');
+    var reset = el('<button class="btn-primary" style="margin-top:18px">' + tr("settingsReset") + '</button>');
     reset.addEventListener("click", function () {
       try { localStorage.removeItem("wd-wallpaper"); localStorage.removeItem("wd-theme"); } catch (e) {}
       applyWallpaper("malam");
@@ -423,7 +515,7 @@
       if (sw[0]) sw[0].classList.add("active");
     });
     body.appendChild(reset);
-    body.appendChild(el('<p class="hint">Pengaturan tersimpan di perangkat ini dan langsung diterapkan saat desktop dibuka lagi.</p>'));
+    body.appendChild(el('<p class="hint">' + tr("settingsHint") + '</p>'));
   }
 
   // ---------- Musik (player audio & video mini) ----------
@@ -463,7 +555,7 @@
 
     var controls = el('<div class="music-controls"></div>');
     var prevBtn = el('<button class="chip">⏮</button>');
-    var playBtn = el('<button class="btn-primary">▶ Putar</button>');
+    var playBtn = el('<button class="btn-primary">' + tr("musicPlay") + '</button>');
     var nextBtn = el('<button class="chip">⏭</button>');
     var timeEl = el('<span class="music-time">0:00 / 0:00</span>');
     controls.appendChild(prevBtn); controls.appendChild(playBtn);
@@ -471,21 +563,21 @@
 
     var seek = el('<input class="music-seek" type="range" min="0" max="100" value="0">');
     var volRow = el('<div class="music-volrow"></div>');
-    var volLabel = el('<span class="hint" style="margin:0">Volume</span>');
+    var volLabel = el('<span class="hint" style="margin:0">' + tr("musicVolume") + '</span>');
     var vol = el('<input class="music-vol" type="range" min="0" max="100" value="80">');
     volRow.appendChild(volLabel); volRow.appendChild(vol);
 
     var listEl = el('<div class="music-list"></div>');
 
     var addRow = el('<div class="music-add"></div>');
-    var urlInput = el('<input type="text" placeholder="Tempel URL audio/video, mis. https://.../lagu.mp3">');
-    var addBtn = el('<button class="btn-primary">Tambah</button>');
+    var urlInput = el('<input type="text" placeholder="' + tr("musicAddPlaceholder") + '">');
+    var addBtn = el('<button class="btn-primary">' + tr("musicAdd") + '</button>');
     addRow.appendChild(urlInput); addRow.appendChild(addBtn);
 
     body.appendChild(stage); body.appendChild(controls);
     body.appendChild(seek); body.appendChild(volRow);
     body.appendChild(listEl); body.appendChild(addRow);
-    body.appendChild(el('<p class="hint">Trek demo butuh internet. Trek tambahan tersimpan di perangkat ini.</p>'));
+    body.appendChild(el('<p class="hint">' + tr("musicHint") + '</p>'));
 
     function currentTrack() { return tracks[current]; }
     function tryPlay() {
@@ -493,9 +585,9 @@
       try {
         var p = media.play();
         if (p && p.then) {
-          p.then(function () { playBtn.textContent = "⏸ Jeda"; }).catch(function () {});
+          p.then(function () { playBtn.textContent = tr("musicPause"); }).catch(function () {});
         } else {
-          playBtn.textContent = "⏸ Jeda";
+          playBtn.textContent = tr("musicPause");
         }
       } catch (e) { /* abaikan: pengguna bisa menekan Putar */ }
     }
@@ -511,7 +603,7 @@
       media.volume = vol.value / 100;
       titleEl.textContent = (isVideo ? "🎬 " : "🎵 ") + t.title;
       errEl.classList.add("hidden");
-      playBtn.textContent = "▶ Putar";
+      playBtn.textContent = tr("musicPlay");
       seek.value = 0;
       timeEl.textContent = "0:00 / 0:00";
       drawList();
@@ -530,7 +622,7 @@
         name.addEventListener("click", function () { playTrack(i); });
         row.appendChild(name);
         if (i >= DEMO_TRACKS.length) {
-          var del = el('<button class="chip">Hapus</button>');
+          var del = el('<button class="chip">' + tr("musicDelete") + '</button>');
           del.addEventListener("click", function () {
             custom = custom.filter(function (c) { return c.url !== t.url; });
             save("wd-music", custom);
@@ -553,9 +645,9 @@
       });
       m.addEventListener("ended", function () { playTrack(current + 1); });
       m.addEventListener("error", function () {
-        errEl.textContent = "Gagal memuat media ini. Periksa URL atau koneksi internet, lalu coba trek lain.";
+        errEl.textContent = tr("musicLoadError");
         errEl.classList.remove("hidden");
-        playBtn.textContent = "▶ Putar";
+        playBtn.textContent = tr("musicPlay");
       });
     }
     bindMediaEvents(audioEl);
@@ -567,7 +659,7 @@
         tryPlay();
       } else {
         media.pause();
-        playBtn.textContent = "▶ Putar";
+        playBtn.textContent = tr("musicPlay");
       }
     });
     prevBtn.addEventListener("click", function () { playTrack(current - 1); });
@@ -602,11 +694,11 @@
     var out = el('<div class="term-output"></div>');
     var row = el('<div class="term-input-row"></div>');
     var prompt = el('<span class="term-prompt">rutbhics:~$</span>');
-    var input = el('<input class="term-input" type="text" placeholder="Ketik help untuk daftar perintah...">');
+    var input = el('<input class="term-input" type="text" placeholder="' + tr("termPlaceholder") + '">');
     row.appendChild(prompt); row.appendChild(input);
     wrap.appendChild(out); wrap.appendChild(row);
     body.appendChild(wrap);
-    body.appendChild(el('<p class="hint">Perintah semu saja — terminal ini tidak menjalankan program di perangkat.</p>'));
+    body.appendChild(el('<p class="hint">' + tr("termHint") + '</p>'));
 
     var history = [];
     var histIdx = 0;
@@ -625,7 +717,7 @@
     }
     function wibDate() {
       try {
-        return new Intl.DateTimeFormat("id-ID", {
+        return new Intl.DateTimeFormat(langNow() === "en" ? "en-US" : "id-ID", {
           timeZone: "Asia/Jakarta", weekday: "long", day: "numeric",
           month: "long", year: "numeric", hour: "2-digit",
           minute: "2-digit", second: "2-digit", hour12: false
@@ -640,16 +732,16 @@
       var name = parts[0].toLowerCase();
       var arg = parts.slice(1).join(" ");
       if (name === "help") {
-        print("Perintah yang tersedia:");
-        print("  help   - tampilkan daftar perintah ini");
-        print("  about  - tentang Rutbhics");
-        print("  echo   - tampilkan teks, mis. echo halo");
-        print("  date   - tanggal & jam sekarang (WIB)");
-        print("  clear  - bersihkan layar terminal");
+        print(tr("termHelpTitle"));
+        print(tr("termHelpHelp"));
+        print(tr("termHelpAbout"));
+        print(tr("termHelpEcho"));
+        print(tr("termHelpDate"));
+        print(tr("termHelpClear"));
       } else if (name === "about") {
-        print("Rutbhics — desktop komputer di dalam browser.");
-        print("Dibangun dengan HTML, CSS, dan JavaScript murni, tanpa framework.");
-        print("Terminal ini hanya perintah semu: tidak menjalankan program atau mengakses berkas sistem.");
+        print(tr("termAbout1"));
+        print(tr("termAbout2"));
+        print(tr("termAbout3"));
       } else if (name === "echo") {
         print(arg);
       } else if (name === "date") {
@@ -657,11 +749,11 @@
       } else if (name === "clear") {
         out.innerHTML = "";
       } else {
-        print("perintah tidak ditemukan: " + name + " — ketik help untuk daftar perintah.");
+        print(tr("termNotFound").replace("{name}", name));
       }
     }
 
-    print("Selamat datang di Terminal Rutbhics! Ketik help untuk daftar perintah.");
+    print(tr("termWelcome"));
     input.addEventListener("keydown", function (e) {
       if (e.key === "Enter") {
         var v = input.value;
@@ -703,7 +795,7 @@
     var ctx = canvas.getContext("2d");
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    var status = el('<p class="hint">Gambar tersimpan otomatis di perangkat ini.</p>');
+    var status = el('<p class="hint">' + tr("gambarAutoSave") + '</p>');
 
     var color = "#111111";
     var size = 4;
@@ -733,13 +825,13 @@
       return b;
     });
     markActive(colorBtns, colorBtns[0]);
-    var eraserBtn = mkBtn("🧽 Penghapus", "gambar-btn");
+    var eraserBtn = mkBtn(tr("gambarEraser"), "gambar-btn");
     eraserBtn.addEventListener("click", function () {
       erasing = true;
       markActive(colorBtns, null);
       markActive([eraserBtn], eraserBtn);
     });
-    var sizeBtns = [[2, "Tipis"], [5, "Sedang"], [12, "Tebal"]].map(function (s) {
+    var sizeBtns = [[2, tr("gambarThin")], [5, tr("gambarMedium")], [12, tr("gambarThick")]].map(function (s) {
       var b = mkBtn(s[1], "gambar-btn");
       b.addEventListener("click", function () {
         size = s[0];
@@ -748,14 +840,14 @@
       return b;
     });
     markActive(sizeBtns, sizeBtns[1]);
-    var clearBtn = mkBtn("🗑 Hapus", "gambar-btn");
+    var clearBtn = mkBtn(tr("gambarClear"), "gambar-btn");
     clearBtn.addEventListener("click", function () {
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       save("wd-gambar", canvas.toDataURL("image/png"));
-      status.textContent = "Kanvas dibersihkan dan tersimpan ✓";
+      status.textContent = tr("gambarCleared");
     });
-    var dlBtn = mkBtn("⬇ Unduh PNG", "btn-primary");
+    var dlBtn = mkBtn(tr("gambarDownload"), "btn-primary");
     dlBtn.addEventListener("click", function () {
       var a = document.createElement("a");
       a.href = canvas.toDataURL("image/png");
@@ -802,7 +894,7 @@
       if (!drawing) return;
       drawing = false;
       save("wd-gambar", canvas.toDataURL("image/png"));
-      status.textContent = "Tersimpan ✓ (otomatis di perangkat ini)";
+      status.textContent = tr("gambarSaved");
     }
     canvas.addEventListener("pointerup", endStroke);
     canvas.addEventListener("pointercancel", endStroke);
