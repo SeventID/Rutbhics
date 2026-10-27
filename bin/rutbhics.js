@@ -7,7 +7,10 @@
 // Selain berkas statis, server ini menyediakan:
 //   POST /api/chat — proxy ke Larprouter (chat completions) untuk semua
 //   kontak di aplikasi Obrolan (Teman, Grup Keluarga, Bot Asisten, dengan
-//   persona masing-masing). Kunci API TIDAK PERNAH dikirim ke browser: kunci
+//   persona masing-masing). Klien boleh menyertakan "model" di body untuk
+//   memilih model per percakapan; tanpa itu dipakai LARPROUTER_MODEL.
+//   GET /api/models — daftar model (live dari Larprouter bila kunci ada,
+//   kalau tidak daftar cadangan). Kunci API TIDAK PERNAH dikirim ke browser: kunci
 //   dibaca server dari variabel lingkungan atau berkas .env lokal.
 //   Salin .env.example menjadi .env, isi LARPROUTER_API_KEY, lalu jalankan
 //   ulang. Berkas .env tidak pernah dilayani sebagai berkas statis dan
@@ -57,6 +60,15 @@ loadEnvFile(path.join(ROOT, ".env"));
 
 const LARPROUTER_BASE = (process.env.LARPROUTER_BASE_URL || "https://larprouter.com/v1").replace(/\/+$/, "");
 const LARPROUTER_MODEL = process.env.LARPROUTER_MODEL || "deepseek-v4.1-flash";
+// Daftar cadangan bila /api/models tidak bisa mengambil daftar live.
+const FALLBACK_MODELS = [
+  "deepseek-v4.1-flash",
+  "claude-opus-4-7-1m",
+  "deepseek-v4.1-flash-1017-abliterated",
+  "deepseek-v4.1-flash-fast",
+  "glm-5.3",
+  "glm-5.3-flash"
+];
 const LARPROUTER_KEY = process.env.LARPROUTER_API_KEY || "";
 const API_KEY_CONFIGURED = LARPROUTER_KEY.length > 0;
 
@@ -133,19 +145,25 @@ function handleChat(req, res) {
     const systemPrompt = typeof input.system === "string" && input.system.trim()
       ? input.system.slice(0, 500)
       : "Kamu adalah Bot Asisten di desktop Rutbhics. Jawab singkat, jelas, dan dalam Bahasa Indonesia.";
+    // Model bisa dipilih klien per percakapan; dibatasi 200 karakter.
+    // Tanpa itu dipakai model bawaan server (LARPROUTER_MODEL).
+    const reqModel = typeof input.model === "string" && input.model.trim()
+      ? input.model.trim().slice(0, 200)
+      : LARPROUTER_MODEL;
     const payload = JSON.stringify({
-      model: LARPROUTER_MODEL,
+      model: reqModel,
       max_tokens: 1024,
       messages: [{ role: "system", content: systemPrompt }].concat(clean)
     });
     const target = new URL(LARPROUTER_BASE + "/chat/completions");
+    const upMod = target.protocol === "http:" ? http : https;
     let responded = false;
     const replyOnce = (status, obj) => {
       if (responded) return;
       responded = true;
       sendJson(res, status, obj);
     };
-    const up = https.request({
+    const up = upMod.request({
       method: "POST",
       hostname: target.hostname,
       port: target.port || 443,
@@ -170,7 +188,7 @@ function handleChat(req, res) {
           replyOnce(502, { error: "larprouter_gagal", message: detail });
           return;
         }
-        replyOnce(200, { reply: data.choices[0].message.content });
+        replyOnce(200, { reply: data.choices[0].message.content, model: reqModel });
       });
     });
     up.on("timeout", () => { up.destroy(new Error("timeout")); });
@@ -183,6 +201,51 @@ function handleChat(req, res) {
     up.write(payload);
     up.end();
   }).catch(() => { sendJson(res, 400, { error: "body_tidak_valid" }); });
+}
+
+// ---------- Daftar model -> Larprouter ----------
+// GET /api/models (loopback saja, seperti /api/chat): daftar model live
+// dari Larprouter bila kunci ada; kalau tidak, daftar cadangan.
+function handleModels(req, res) {
+  if (!isLoopback(req)) {
+    sendJson(res, 403, { error: "forbidden", message: "Endpoint /api/models hanya untuk pemakaian lokal." });
+    return;
+  }
+  if (req.method !== "GET") {
+    sendJson(res, 405, { error: "method_tidak_didukung" });
+    return;
+  }
+  let responded = false;
+  const once = (obj) => { if (!responded) { responded = true; sendJson(res, 200, obj); } };
+  const fallback = () => once({ models: FALLBACK_MODELS.slice(), source: "fallback" });
+  if (!API_KEY_CONFIGURED) { fallback(); return; }
+  const target = new URL(LARPROUTER_BASE + "/models");
+  const mod = target.protocol === "http:" ? http : https;
+  const up = mod.request({
+    method: "GET",
+    hostname: target.hostname,
+    port: target.port || (target.protocol === "http:" ? 80 : 443),
+    path: target.pathname + target.search,
+    headers: { Authorization: "Bearer " + LARPROUTER_KEY },
+    timeout: 15000
+  }, (upRes) => {
+    const chunks = [];
+    upRes.on("data", (c) => chunks.push(c));
+    upRes.on("end", () => {
+      let data = null;
+      try { data = JSON.parse(Buffer.concat(chunks).toString("utf8")); } catch (e) { /* abaikan */ }
+      const ids = data && Array.isArray(data.data) ? data.data
+        .map((m) => (m && typeof m.id === "string" ? m.id : null))
+        .filter(Boolean)
+        .filter((v, i, a) => a.indexOf(v) === i)
+        .slice(0, 100) : [];
+      if (upRes.statusCode !== 200 || !ids.length) { fallback(); return; }
+      once({ models: ids, source: "live" });
+    });
+  });
+  up.on("timeout", () => { up.destroy(new Error("timeout")); });
+  up.on("error", () => fallback());
+  up.end();
 }
 
 // Perintah setup mandiri: tanya kunci Larprouter, simpan ke .env folder
@@ -201,6 +264,7 @@ const server = http.createServer((req, res) => {
   try {
     const url = new URL(req.url, "http://localhost");
     if (url.pathname === "/api/chat") { handleChat(req, res); return; }
+    if (url.pathname === "/api/models") { handleModels(req, res); return; }
     // Jangan pernah melayani dotfile (termasuk .env) sebagai berkas statis.
     if (url.pathname.startsWith("/.")) {
       res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });

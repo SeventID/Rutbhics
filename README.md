@@ -127,8 +127,12 @@ Cara mengaktifkan:
 
 Catatan:
 
-- Model bawaan `deepseek-v4.1-flash` (model utama `claude-opus-4-7-1m` bisa
-  dipilih lewat `LARPROUTER_MODEL` setelah kreditnya cukup).
+- Multi-model: daftar model diambil live dari Larprouter lewat
+  `GET /api/models` (daftar cadangan bila gagal); di Obrolan ada dropdown
+  model di atas kolom tulis — pilihan tersimpan di perangkat (`wd-model`)
+  dan dikirim sebagai field `model` di `POST /api/chat`. Model bawaan server
+  tetap `deepseek-v4.1-flash` (bisa diubah lewat `LARPROUTER_MODEL` di `.env`;
+  model utama `claude-opus-4-7-1m` bisa dipilih begitu kreditnya cukup).
 - Kunci tidak pernah masuk repo, tidak pernah dikirim ke browser: browser hanya
   memanggil `POST /api/chat` di server lokal, kunci dibaca server dari `.env`.
   Server juga tidak pernah melayani berkas `.env` sebagai berkas statis, dan
