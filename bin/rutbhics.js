@@ -1187,6 +1187,23 @@ function oauthBase(req) {
   return (process.env.OAUTH_REDIRECT_BASE || "").replace(/\/$/, "") || ("http://" + req.headers.host);
 }
 const oauthStates = {};
+// Cookie pengikat OAuth (A2-03, anti login CSRF): lihat komentar di
+// initiate. Nilai pengikat acak terpisah dari state, disimpan di record
+// state; callback wajib membawa cookie yang cocok.
+function oauthBindCookie(bind) {
+  return "rutbhics_oauth_bind=" + bind + "; HttpOnly; SameSite=Lax; Max-Age=600; Path=/api/auth/";
+}
+function clearOAuthBindCookie() {
+  return "rutbhics_oauth_bind=; HttpOnly; SameSite=Lax; Max-Age=0; Path=/api/auth/";
+}
+// Perbandingan pengikat waktu-konstan (bila panjang sama); panjang beda
+// -> tidak valid. Cookie hilang -> string kosong -> tidak valid.
+function oauthBindMatches(cookieVal, stored) {
+  if (typeof cookieVal !== "string" || typeof stored !== "string") return false;
+  const a = Buffer.from(cookieVal, "utf8"), b = Buffer.from(stored, "utf8");
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
 function httpsPostForm(urlStr, params, extraHeaders) {
   return new Promise((resolve, reject) => {
     const u = new URL(urlStr);
@@ -1231,8 +1248,8 @@ function httpsGetJson(urlStr, extraHeaders) {
     r.end();
   });
 }
-function oauthFail(res, msg) {
-  res.writeHead(400, Object.assign({ "Content-Type": "text/html; charset=utf-8" }, securityHeaders()));
+function oauthFail(res, msg, extraHeaders) {
+  res.writeHead(400, Object.assign({ "Content-Type": "text/html; charset=utf-8" }, securityHeaders(), extraHeaders || {}));
   res.end("<h1>Login gagal</h1><p>" + msg + "</p><p><a href='/'>Kembali ke Rutbhics</a></p>");
 }
 function handleAuth(req, res) {
@@ -1353,7 +1370,17 @@ function handleAuth(req, res) {
     if (!cfg) { sendJson(res, 400, { error: "oauth_tidak_dikonfigurasi" }); return; }
     Object.keys(oauthStates).forEach((k) => { if (Date.now() - oauthStates[k].createdAt > 10 * 60 * 1000) delete oauthStates[k]; });
     const state = crypto.randomBytes(16).toString("hex");
-    oauthStates[state] = { provider: action, createdAt: Date.now() };
+    // Pengikat OAuth ke browser pemrakarsa (A2-03, anti login CSRF):
+    // nilai acak TERPISAH dari state — bukan hash state, agar bocornya
+    // state via Referer/log tidak otomatis membocorkan pengikat.
+    // Cookie: HttpOnly, SameSite=Lax (callback adalah navigasi GET
+    // top-level lintas situs dari provider; Strict tidak mengirim cookie
+    // dan merusak alur), Max-Age 600 (sejajar expiry state 10 menit),
+    // Path /api/auth/ (mencakup initiate + callback). Tanpa flag Secure
+    // untuk sekarang, konsisten dengan cookie sesi yang belum Secure —
+    // S5 nantinya harus mencakup cookie ini juga.
+    const bind = crypto.randomBytes(16).toString("hex");
+    oauthStates[state] = { provider: action, createdAt: Date.now(), bind };
     const redirectUri = oauthBase(req) + "/api/auth/" + action + "/callback";
     let target;
     if (action === "google") {
@@ -1367,7 +1394,7 @@ function handleAuth(req, res) {
         + "&scope=" + encodeURIComponent("read:user user:email")
         + "&state=" + state;
     }
-    res.writeHead(302, Object.assign({ Location: target }, securityHeaders()));
+    res.writeHead(302, Object.assign({ Location: target, "Set-Cookie": oauthBindCookie(bind) }, securityHeaders()));
     res.end();
     return;
   }
@@ -1376,12 +1403,22 @@ function handleAuth(req, res) {
     const code = url.searchParams.get("code") || "";
     const rec = oauthStates[state];
     delete oauthStates[state];
-    if (!rec || rec.provider !== action || Date.now() - rec.createdAt > 10 * 60 * 1000 || !code) {
-      oauthFail(res, "Tautan login tidak valid atau sudah kedaluwarsa. Coba lagi dari Rutbhics.");
+    // Pengikatan browser (A2-03): cookie pengikat wajib ada DAN sama
+    // dengan nilai yang tersimpan untuk state ini. Kegagalan memakai
+    // 400 generik yang SAMA dengan state-tidak-valid (tidak membocorkan
+    // cek mana yang gagal). Sekali pakai dipertahankan: state sudah
+    // dihapus di atas pada SETIAP percobaan callback.
+    // Initiate kedua menimpa cookie dengan bind terbaru, sehingga state
+    // pertama menjadi tidak dapat dipakai (diterima — selesaikan alur
+    // terbaru). Callback dari browser/profil berbeda -> 400.
+    const bindHdr = (req.headers.cookie || "").split(";").map((s) => s.trim()).find((s) => s.startsWith("rutbhics_oauth_bind="));
+    const bindVal = bindHdr ? bindHdr.slice("rutbhics_oauth_bind=".length) : "";
+    if (!rec || rec.provider !== action || Date.now() - rec.createdAt > 10 * 60 * 1000 || !code || !oauthBindMatches(bindVal, rec.bind)) {
+      oauthFail(res, "Tautan login tidak valid atau sudah kedaluwarsa. Coba lagi dari Rutbhics.", { "Set-Cookie": clearOAuthBindCookie() });
       return;
     }
     const cfg = oauthConfig(action);
-    if (!cfg) { oauthFail(res, "Login ini belum dikonfigurasi di server."); return; }
+    if (!cfg) { oauthFail(res, "Login ini belum dikonfigurasi di server.", { "Set-Cookie": clearOAuthBindCookie() }); return; }
     const redirectUri = oauthBase(req) + "/api/auth/" + action + "/callback";
     (async () => {
       try {
@@ -1419,10 +1456,12 @@ function handleAuth(req, res) {
         }
         const token = createSession(user.id);
         setSessionCookie(res, token);
+        // Bersihkan cookie pengikat best-effort (state sudah hangus).
+        res.setHeader("Set-Cookie", [res.getHeader("Set-Cookie"), clearOAuthBindCookie()]);
         res.writeHead(302, Object.assign({ Location: "/" }, securityHeaders()));
         res.end();
       } catch (e) {
-        oauthFail(res, "Gagal mengambil profil dari " + (action === "google" ? "Google" : "GitHub") + ". Coba lagi.");
+        oauthFail(res, "Gagal mengambil profil dari " + (action === "google" ? "Google" : "GitHub") + ". Coba lagi.", { "Set-Cookie": clearOAuthBindCookie() });
       }
     })();
     return;

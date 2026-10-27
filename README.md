@@ -327,6 +327,16 @@ Perilaku:
 >   Host IP). Split-hosting (desktop statis dari port lain) mendapat 403
 >   pada tulis — layani desktop dari server yang sama.
 >
+> **Pengikatan state OAuth ke browser (A2-03):** saat initiate
+>   (`GET /api/auth/google|github`), server menyetel cookie pengikat
+>   HttpOnly `rutbhics_oauth_bind` (SameSite=Lax, Max-Age 600 detik,
+>   Path `/api/auth/`, tanpa flag Secure untuk sekarang — S5 nantinya
+>   harus mencakup cookie ini juga); callback wajib membawa cookie yang
+>   cocok dengan nilai yang tersimpan untuk state itu, kalau tidak 400
+>   generik yang sama dengan state-tidak-valid, dan state tetap hangus
+>   (sekali pakai dipertahankan). Initiate kedua menimpa cookie sehingga
+>   state pertama menjadi tidak dapat dipakai — selesaikan alur terbaru.
+>
 > **PERINGATAN TEGAS:** `AI_ACCESS=local` yang disetel eksplisit TETAP
 > BERBAHAYA bila server diekspos lewat reverse proxy/domain publik —
 > kunci AI menjadi terbuka; operator yang mengekspos server WAJIB memakai
