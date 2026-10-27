@@ -1,5 +1,6 @@
 // Tes skrip backup P3: salinan byte-identik + manifest + mode .env 600 +
 // penolakan direktori di dalam folder aplikasi + gagal bila tidak ada data.
+// A2-12: manifest hanya basename — tidak ada field source/path absolut.
 // Port S11 dari staging P3 (dirapikan: path root repo saja).
 "use strict";
 var fs = require("fs");
@@ -43,6 +44,9 @@ function main() {
     check(mode === 0o600, "backup lengkap -> salinan .env mode 600 (dapat: " + mode.toString(8) + ")");
     var man = JSON.parse(fs.readFileSync(path.join(dest, "manifest.json"), "utf8"));
     check(man.files.length === 4 && man.createdAt, "backup lengkap -> manifest.json 4 berkas + timestamp");
+    // A2-12: manifest hanya basename — tidak ada path absolut / field source.
+    check(man.files.every(function (f) { return f.name === path.basename(f.name) && f.name.indexOf("/") === -1 && !("source" in f); }), "backup lengkap -> manifest hanya basename (tanpa field source)");
+    check(JSON.stringify(man).indexOf(tmp) === -1 && JSON.stringify(man).indexOf(cwd1) === -1, "backup lengkap -> manifest tidak mengandung path direktori temp/aplikasi");
 
     // Kasus 2: direktori di dalam folder aplikasi -> ditolak
     var r2 = runBackup(cwd1, ["--dir", path.join(WORK, "dilarang")]);
@@ -64,6 +68,8 @@ function main() {
     var subs4 = fs.readdirSync(path.join(tmp, "backups4")).filter(function (n) { return n.indexOf("rutbhics-backup-") === 0; });
     var dest4 = path.join(tmp, "backups4", subs4[0]);
     check(fs.existsSync(path.join(dest4, ".env")) && !fs.existsSync(path.join(dest4, "rutbhics-users.json")), "backup hanya .env -> hanya .env tersalin");
+    var man4 = JSON.parse(fs.readFileSync(path.join(dest4, "manifest.json"), "utf8"));
+    check(man4.files.length === 1 && man4.files[0].name === ".env" && !("source" in man4.files[0]) && JSON.stringify(man4).indexOf(tmp) === -1, "backup hanya .env -> manifest hanya basename .env (tanpa path absolut)");
   } finally {
     try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e) {}
   }

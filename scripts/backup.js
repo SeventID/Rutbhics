@@ -56,7 +56,11 @@ function main() {
       const out = path.join(dest, base);
       fs.copyFileSync(t, out);
       if (base === ".env") { try { fs.chmodSync(out, 0o600); } catch (e) {} }
-      manifest.files.push({ name: base, source: t });
+      // A2-12: manifest hanya mencatat basename — field source (path absolut
+      // sumber) dihapus karena membocorkan tata letak direktori server dan
+      // tidak dipakai pemulihan otomatis (restore = salin dari direktori
+      // backup ke root aplikasi menurut basename).
+      manifest.files.push({ name: base });
       copied += 1;
       console.log("[backup] disalin: " + t + " -> " + out);
     }

@@ -500,7 +500,7 @@ node scripts/backup.js --dir /var/backups/rutbhics
 
 Menyalin `rutbhics-users.json`, `rutbhics-chat.json`, `.env` (plus
 `.bak` bila ada) dari folder kerja — atau folder paket bila tidak ada di
-folder kerja — beserta `manifest.json` (daftar berkas + sumbernya).
+folder kerja — beserta `manifest.json` (daftar berkas cadangan, hanya basename — A2-12).
 Salinan `.env` ditulis mode 600. Direktori backup di dalam folder
 aplikasi ditolak (berkasnya bisa dilayani sebagai berkas statis).
 Memulihkan: salin kembali berkasnya ke folder kerja lalu restart server.
