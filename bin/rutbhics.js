@@ -655,9 +655,16 @@ if (!Array.isArray(chatData.messages.umum)) chatData.messages.umum = [];
 function saveChat() {
   atomicSave(CHAT_FILE, chatData);
 }
+// Dasar slug bersama (dipakai slugRoom + slugUsername di bawah): huruf
+// kecil, ganti selain a-z0-9 dengan "-", pangkas "-" di ujung; kosong
+// -> fallback. (Perilaku lama dipertahankan: slugUsername memotong
+// 30 karakter setelah ini; slugRoom tanpa batas panjang.)
+function slugBase(name, fallback) {
+  let s = (name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return s || fallback;
+}
 function slugRoom(name) {
-  let s = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-  if (!s) s = "ruang";
+  let s = slugBase(name, "ruang");
   let id = s, i = 2;
   while (chatData.rooms.some((r) => r.id === id)) { id = s + "-" + i; i += 1; }
   return id;
@@ -801,8 +808,7 @@ function validUsername(name) { return /^[A-Za-z0-9_.-]{3,30}$/.test(name); }
 function validEmail(email) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email); }
 function validPhone(phone) { return /^\+?\d{8,15}$/.test(phone); }
 function slugUsername(name) {
-  let s = (name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-  if (!s) s = "pengguna";
+  let s = slugBase(name, "pengguna");
   if (s.length > 30) s = s.slice(0, 30);
   let out = s, i = 2;
   while (usersData.users.some((u) => u.username.toLowerCase() === out.toLowerCase())) { out = s + "-" + i; i += 1; }

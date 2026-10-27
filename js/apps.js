@@ -889,6 +889,10 @@
     laut: { name: { id: "Laut Biru", en: "Blue Sea" },
       bg: "radial-gradient(600px 400px at 20% 15%, rgba(56, 189, 248, .45), transparent 60%), radial-gradient(700px 500px at 85% 80%, rgba(45, 212, 191, .30), transparent 60%), linear-gradient(160deg, #082f49, #0c4a6e 55%, #020617)" }
   };
+  // Diekspor untuk desktop.js (wallpaper awal): index.html memuat
+  // js/apps.js SEBELUM js/desktop.js, jadi window.WALLPAPERS sudah ada
+  // saat desktop.js membacanya. Jangan ubah urutan load tanpa
+  // memindahkan definisi ini.
   window.WALLPAPERS = WALLPAPERS;
   function applyWallpaper(id) {
     var w = document.getElementById("wallpaper");

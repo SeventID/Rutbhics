@@ -74,8 +74,10 @@
   var serverAuth = document.getElementById("server-auth");
 
   // Bahasa halaman login mengikuti pilihan di desktop (localStorage
-  // "wd-lang"); halaman ini tidak memuat desktop.js jadi kamusnya
-  // sendiri di sini.
+  // "wd-lang"). Halaman ini tidak memuat js/apps.js maupun desktop.js
+  // (harus mandiri, termasuk saat dibuka dari hosting statis tanpa
+  // server), jadi kamusnya sendiri di sini — sengaja tidak berbagi
+  // kamus TR apps.js.
   var lang = "id";
   try { lang = localStorage.getItem("wd-lang") || "id"; } catch (e) {}
   if (lang !== "id" && lang !== "en") lang = "id";

@@ -464,6 +464,9 @@
   } catch (e) {}
 
   // Pengaturan tersimpan (diatur lewat aplikasi Pengaturan): wallpaper & tema.
+  // WALLPAPERS didefinisikan di js/apps.js (window.WALLPAPERS); index.html
+  // memuat apps.js sebelum desktop.js. Guard window.WALLPAPERS di bawah
+  // menjaga halaman tetap jalan bila urutan itu berubah.
   try {
     var wallEl = document.getElementById("wallpaper");
     var savedWp = localStorage.getItem("wd-wallpaper");
