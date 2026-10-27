@@ -362,6 +362,17 @@ Perilaku:
 >   kebersihan memori; semua keputusan blokir tetap ditegakkan
 >   pemeriksaan malas, bukan oleh sapuan.
 >
+> **Lockfile instance-tunggal (S7):** server mengakuisisi `.rutbhics.lock`
+>   di folder kerja SEBELUM memuat berkas data (dengan `wx` eksklusif).
+>   Proses kedua di folder yang sama menolak start dengan pesan jelas
+>   (bukan menimpa data). Lock basi (PID sudah mati, mis. sesudah crash
+>   SIGKILL) dicuri dengan peringatan; lock berisi data tak dikenal
+>   ditolak agar berkas asing tidak dihapus. Keluar bersih (SIGINT/SIGTERM)
+>   menghapus lock; mode `--setup` melewati lock. Edge: PID usang yang
+>   dipakai ulang proses tak terkait akan menolak start secara keliru
+>   (jarang) — hapus lockfile manual. Multi-instance sejati tetap hanya
+>   mungkin lewat Tahap 2 SQLite.
+>
 > **PERINGATAN TEGAS:** `AI_ACCESS=local` yang disetel eksplisit TETAP
 > BERBAHAYA bila server diekspos lewat reverse proxy/domain publik —
 > kunci AI menjadi terbuka; operator yang mengekspos server WAJIB memakai

@@ -42,6 +42,64 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 
 const ROOT = path.join(__dirname, "..");
+
+// Lockfile instance-tunggal (S7, A2-05): satu folder kerja hanya boleh
+// dijalankan satu proses server. Dua proses satu cwd akan last-writer-wins
+// dan menghilangkan data (ruang/pesan/kuota/sesi) — dibuktikan audit.
+// Diakuisisi SEBELUM berkas data apa pun dimuat (load users/chat ada di
+// bawah), dan dilewati pada mode --setup (setup hanya menulis .env lalu
+// berhenti, bukan server). Nama diawali titik agar aturan dotfile server
+// (404) menghalanginya dilayani sebagai berkas statis. Multi-instance
+// sejati tetap hanya mungkin lewat Tahap 2 SQLite; lock ini hanya
+// mencegah kecelakaan. Edge: PID usang yang dipakai ulang proses tak
+// terkait akan menolak start secara keliru (jarang) — remedinya hapus
+// lockfile manual (lihat pesan penolakan).
+const LOCK_FILE = path.join(process.cwd(), ".rutbhics.lock");
+let lockHeld = false;
+function releaseLock() {
+  if (!lockHeld) return;
+  lockHeld = false;
+  try {
+    if (fs.readFileSync(LOCK_FILE, "utf8").trim() === String(process.pid)) fs.unlinkSync(LOCK_FILE);
+  } catch (e) { /* lock sudah hilang/diambil proses lain */ }
+}
+function acquireLock() {
+  if (process.argv.includes("--setup")) return;
+  try {
+    fs.writeFileSync(LOCK_FILE, String(process.pid), { flag: "wx" });
+  } catch (e) {
+    if (!e || e.code !== "EEXIST") throw e;
+    let old = null;
+    try { old = fs.readFileSync(LOCK_FILE, "utf8").trim(); } catch (e2) {
+      console.error("Rutbhics: tidak dapat membaca lockfile " + LOCK_FILE + " — server lain mungkin berjalan. Hapus lockfile bila yakin tidak ada server aktif, lalu jalankan ulang.");
+      process.exit(1);
+    }
+    const oldPid = Number(old);
+    if (!old || !Number.isInteger(oldPid) || oldPid <= 0) {
+      console.error("Rutbhics: lockfile " + LOCK_FILE + " berisi data tak dikenal (bukan PID) — menolak start agar tidak menghapus berkas asing. Hapus lockfile manual bila yakin, lalu jalankan ulang.");
+      process.exit(1);
+    }
+    let alive = false;
+    try { process.kill(oldPid, 0); alive = true; } catch (e3) {
+      if (e3 && e3.code === "EPERM") alive = true;
+      else if (!e3 || e3.code !== "ESRCH") {
+        console.error("Rutbhics: tidak dapat memeriksa PID " + oldPid + " di lockfile " + LOCK_FILE + " — menolak start. Hapus lockfile bila yakin tidak ada server aktif, lalu jalankan ulang.");
+        process.exit(1);
+      }
+    }
+    if (alive) {
+      console.error("Rutbhics: server sudah berjalan di folder ini (PID " + oldPid + ", lockfile " + LOCK_FILE + ") — menolak start kedua agar data tidak rusak. Hentikan proses pertama dulu, atau hapus lockfile bila proses itu sudah mati.");
+      process.exit(1);
+    }
+    console.error("Rutbhics: PERINGATAN: lockfile basi (PID " + oldPid + " sudah mati) — mengambil alih lock " + LOCK_FILE + ".");
+    fs.writeFileSync(LOCK_FILE, String(process.pid));
+  }
+  lockHeld = true;
+  process.on("exit", releaseLock);
+  process.on("SIGINT", () => { releaseLock(); process.exit(130); });
+  process.on("SIGTERM", () => { releaseLock(); process.exit(143); });
+}
+acquireLock();
 const MIME = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
