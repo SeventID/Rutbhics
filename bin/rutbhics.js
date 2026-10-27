@@ -401,9 +401,18 @@ function isLoopbackOrigin(req) {
   } catch (e) { return false; }
 }
 
+// Header keamanan dasar (P2a) untuk SEMUA respons. CSP sengaja belum
+// ditambah: skrip inline di index.html/login.html akan rusak.
+function securityHeaders() {
+  return {
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "strict-origin-when-cross-origin"
+  };
+}
+
 function sendJson(res, status, obj) {
   const body = JSON.stringify(obj);
-  res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
+  res.writeHead(status, Object.assign({ "Content-Type": "application/json; charset=utf-8" }, securityHeaders()));
   res.end(body);
 }
 
@@ -857,7 +866,7 @@ function httpsGetJson(urlStr, extraHeaders) {
   });
 }
 function oauthFail(res, msg) {
-  res.writeHead(400, { "Content-Type": "text/html; charset=utf-8" });
+  res.writeHead(400, Object.assign({ "Content-Type": "text/html; charset=utf-8" }, securityHeaders()));
   res.end("<h1>Login gagal</h1><p>" + msg + "</p><p><a href='/'>Kembali ke Rutbhics</a></p>");
 }
 function handleAuth(req, res) {
@@ -973,7 +982,7 @@ function handleAuth(req, res) {
         + "&scope=" + encodeURIComponent("read:user user:email")
         + "&state=" + state;
     }
-    res.writeHead(302, { Location: target });
+    res.writeHead(302, Object.assign({ Location: target }, securityHeaders()));
     res.end();
     return;
   }
@@ -1025,7 +1034,7 @@ function handleAuth(req, res) {
         }
         const token = createSession(user.id);
         setSessionCookie(res, token);
-        res.writeHead(302, { Location: "/" });
+        res.writeHead(302, Object.assign({ Location: "/" }, securityHeaders()));
         res.end();
       } catch (e) {
         oauthFail(res, "Gagal mengambil profil dari " + (action === "google" ? "Google" : "GitHub") + ". Coba lagi.");
@@ -1058,7 +1067,7 @@ const server = http.createServer((req, res) => {
     if (url.pathname === "/api/auth" || url.pathname.startsWith("/api/auth/")) { handleAuth(req, res); return; }
     // Jangan pernah melayani dotfile (termasuk .env) sebagai berkas statis.
     if (url.pathname.startsWith("/.")) {
-      res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+      res.writeHead(404, Object.assign({ "Content-Type": "text/plain; charset=utf-8" }, securityHeaders()));
       res.end("Tidak ditemukan");
       return;
     }
@@ -1071,13 +1080,13 @@ const server = http.createServer((req, res) => {
     try { decodedPath = decodeURIComponent(url.pathname); } catch (e) { /* pakai mentah */ }
     const baseName = path.basename(decodedPath);
     if (BLOCKED_DATA.some((n) => baseName === n || baseName.startsWith(n + "."))) {
-      res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+      res.writeHead(404, Object.assign({ "Content-Type": "text/plain; charset=utf-8" }, securityHeaders()));
       res.end("Tidak ditemukan");
       return;
     }
     let filePath = path.normalize(path.join(ROOT, url.pathname));
     if (!filePath.startsWith(ROOT)) {
-      res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
+      res.writeHead(403, Object.assign({ "Content-Type": "text/plain; charset=utf-8" }, securityHeaders()));
       res.end("Forbidden");
       return;
     }
@@ -1086,16 +1095,16 @@ const server = http.createServer((req, res) => {
     }
     fs.readFile(filePath, (err, data) => {
       if (err) {
-        res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+        res.writeHead(404, Object.assign({ "Content-Type": "text/plain; charset=utf-8" }, securityHeaders()));
         res.end("Tidak ditemukan");
         return;
       }
       const ext = path.extname(filePath).toLowerCase();
-      res.writeHead(200, { "Content-Type": MIME[ext] || "application/octet-stream" });
+      res.writeHead(200, Object.assign({ "Content-Type": MIME[ext] || "application/octet-stream" }, securityHeaders()));
       res.end(data);
     });
   } catch (e) {
-    res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
+    res.writeHead(500, Object.assign({ "Content-Type": "text/plain; charset=utf-8" }, securityHeaders()));
     res.end("Terjadi kesalahan");
   }
 });
