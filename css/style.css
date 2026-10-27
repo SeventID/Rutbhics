@@ -369,3 +369,10 @@ body.light-theme .music-add input { background: rgba(15, 23, 42, .05); }
   border: 1px solid #334155; border-radius: 6px; padding: 8px 10px;
   font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px;
 }
+
+/* Layar sempit (P2f): jendela tidak meluber, widget menumpuk rapi di atas.
+   Hanya berlaku <=480px; layout desktop lebar tidak berubah. */
+@media (max-width: 480px) {
+  .window { max-width: 100vw; }
+  #desktop-widget { left: 8px; right: 8px; top: 8px; width: auto; }
+}
