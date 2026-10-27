@@ -1,19 +1,19 @@
-# Rutbhics
+<div align="center">
 
-Desktop komputer di dalam browser: window manager, taskbar, menu Start, dan
-aplikasi yang berjalan langsung di halaman web — tanpa build step, tanpa
-framework, murni HTML + CSS + JavaScript vanilla (seefisien mungkin).
+# 🖥️ Rutbhics
 
-## Cara menjalankan
+**Desktop komputer di dalam browser: window manager, taskbar, menu Start, dan aplikasi yang berjalan langsung di halaman web.**
 
-Buka `index.html` langsung di browser, atau dari terminal:
+Tanpa build step, tanpa framework — murni HTML + CSS + JavaScript vanilla.
 
-```bash
-python3 -m http.server 8000
-# lalu buka http://localhost:8000
-```
+[![npm version](https://img.shields.io/npm/v/rutbhics)](https://www.npmjs.com/package/rutbhics)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-## Install lewat npm
+</div>
+
+## 🚀 Mulai cepat
+
+**Lewat npm** (butuh Node.js):
 
 ```bash
 npm install -g rutbhics
@@ -23,6 +23,13 @@ rutbhics
 
 Port bisa diubah: `rutbhics --port 3000` atau `PORT=3000 rutbhics`.
 Tanpa install permanen: `npx rutbhics`.
+
+**Tanpa install** — buka `index.html` langsung di browser, atau dari terminal:
+
+```bash
+python3 -m http.server 8000
+# lalu buka http://localhost:8000
+```
 
 Saat install interaktif, installer bertanya: "Apakah Anda punya API
 Larprouter? (y/n)". Jawab `y` lalu masukkan kunci (ketikan disembunyikan)
@@ -34,7 +41,26 @@ hilang. Untuk salinan permanen, jalankan `rutbhics --setup` dari folder
 kerjamu (kunci tersimpan di `.env` folder itu, yang selalu dimenangkan
 server atas `.env` folder paket).
 
-## Login & penggunaan sebagai server
+## 🧩 Aplikasi
+
+| Aplikasi | Fungsinya |
+| --- | --- |
+| 💬 **Obrolan** | Chatting gaya WhatsApp: daftar kontak, kirim pesan, balasan AI (lihat Bot AI), plus mode 👥 Multi-User. Riwayat tersimpan di `localStorage` perangkat. |
+| 🌐 **Peramban** | Mini browser berbasis iframe + kolom alamat + tautan cepat. Catatan: banyak situs besar memblokir tampil di iframe (X-Frame-Options). |
+| 📝 **Catatan** | Catatan teks tersimpan di `localStorage`. |
+| 🔢 **Kalkulator** | Operasi dasar tanpa `eval`. |
+| 📁 **Files** | Penjelajah berkas virtual (folder, berkas teks, edit, hapus), tersimpan di `localStorage`. |
+| ⚙️ **Pengaturan** | Ganti wallpaper (4 pilihan) dan tema terang/gelap, tersimpan di `localStorage` dan diterapkan saat desktop dibuka lagi. Juga tempat mengganti bahasa (Indonesia/Inggris). |
+| 🎵 **Musik** | Player audio & video mini: putar/jeda, trek sebelum/sesudah, geser posisi, volume, daftar putar. Trek demo dari URL publik (butuh internet); trek tambahan (URL audio/video apa pun) bisa ditambahkan dan tersimpan di `localStorage`. |
+| 💻 **Terminal** | Terminal web dengan perintah semu: help, about, echo, date, clear + riwayat tombol panah. |
+| 🎨 **Gambar** | Kanvas coret-coret 800×500: 6 warna + penghapus, 3 ukuran kuas, unduh PNG; gambar tersimpan otomatis di `localStorage`. |
+
+Di desktop juga ada **widget jam/kalender** (pojok kanan atas): jam WIB live
+tiap detik, tanggal lengkap, dan kalender bulan berjalan yang bisa dinavigasi.
+Jendela mendukung **maximize** (tombol ⛶ / double-click header) dan **snap**
+kiri/kanan/atas dengan drag ke tepi layar.
+
+## 🔐 Login & penggunaan sebagai server
 
 Rutbhics bisa dijalankan sebagai server web statis (mis. `python3 -m http.server`,
 Nginx, atau hosting statis apa pun) — tidak butuh backend.
@@ -49,24 +75,7 @@ Nginx, atau hosting statis apa pun) — tidak butuh backend.
   autentikasi server sungguhan. Untuk akun multi-pengguna yang aman,
   diperlukan backend (mis. Node + database + sesi) di tahap berikutnya.
 
-## Aplikasi v1
-
-- **Obrolan** — aplikasi chatting gaya WhatsApp (daftar kontak, kirim pesan,
-  balasan otomatis). Riwayat tersimpan di `localStorage` perangkat.
-- **Peramban** — mini browser berbasis iframe + kolom alamat + tautan cepat.
-  Catatan: banyak situs besar memblokir tampil di iframe (X-Frame-Options).
-- **Catatan** — catatan teks tersimpan di `localStorage`.
-- **Kalkulator** — operasi dasar tanpa `eval`.
-- **Files** — penjelajah berkas virtual (folder, berkas teks, edit, hapus),
-  tersimpan di `localStorage`.
-- **Pengaturan** — ganti wallpaper (4 pilihan) dan tema terang/gelap,
-  tersimpan di `localStorage` dan diterapkan saat desktop dibuka lagi.
-- **Musik** — player audio & video mini: putar/jeda, trek sebelum/
-  sesudah, geser posisi, volume, daftar putar. Trek demo dari URL publik
-  (butuh internet); trek tambahan (URL audio/video apa pun) bisa
-  ditambahkan dan tersimpan di `localStorage`.
-
-## Notifikasi & pusat kontrol (taskbar)
+## 🔔 Notifikasi & pusat kontrol (taskbar)
 
 - Tombol lonceng 🔔 di taskbar dengan badge jumlah notifikasi belum dibaca.
 - Panel notifikasi: daftar notifikasi (waktu WIB), hapus semua, dan
@@ -78,40 +87,22 @@ Nginx, atau hosting statis apa pun) — tidak butuh backend.
 - Toast pop-up muncul tiap notifikasi baru (kecuali mode Jangan Ganggu
   aktif), hilang sendiri setelah 4 detik atau saat diklik.
 
-## Peta jalan (roadmap)
-
-Urutan pembangunan berikutnya (satu item per jadwal build):
-
-1. Aplikasi Files (penjelajah berkas virtual + localStorage) — selesai 26 Okt 2026
-2. Aplikasi Pengaturan (ganti wallpaper, tema terang/gelap) — selesai 26 Okt 2026
-3. Notifikasi & pusat kontrol di taskbar — selesai 26 Okt 2026
-4. Musik/video player mini — selesai 26 Okt 2026
-5. Terminal web (perintah semu: help, about, echo, date) — selesai 26 Okt 2026
-11. Bot AI di Obrolan (Larprouter via proxy lokal + .env) — selesai 26 Okt 2026 (dimajukan atas permintaan langsung)
-12. Chat multi-user (ruang + pesan via server, polling 3 detik) — selesai 27 Okt 2026
-6. Mode jendela maximize + snap kiri/kanan
-7. Aplikasi Gambar (kanvas coret-coret + simpan)
-8. Widget jam/kalender di desktop
-9. Mode multi-bahasa (Indonesia/Inggris)
-10. Halaman login/pengguna + profil — selesai 26 Okt 2026 (dimajukan atas permintaan langsung)
-
-> Nama proyek: **Rutbhics** (dipilih Kang Mas, 26 Okt 2026).
-
-## Struktur
+## 📂 Struktur
 
 ```
-index.html        — shell: wallpaper, ikon desktop, taskbar, menu Start, panel notifikasi & pusat kontrol
+index.html        — shell: wallpaper, ikon desktop, taskbar, menu Start, panel notifikasi & pusat kontrol, widget jam/kalender
 login.html        — halaman login (akun lokal perangkat) + kunci desktop
 css/style.css     — seluruh tampilan desktop & aplikasi
-js/desktop.js     — window manager (drag, minimize, focus, taskbar, jam WIB, terapkan pengaturan tersimpan, notifikasi & pusat kontrol)
-js/apps.js        — aplikasi bawaan (obrolan, peramban, catatan, kalkulator, files, pengaturan, musik)
+js/desktop.js     — window manager (drag, minimize, focus, taskbar, jam WIB, terapkan pengaturan tersimpan, notifikasi & pusat kontrol, maximize & snap)
+js/apps.js        — aplikasi bawaan (obrolan, peramban, catatan, kalkulator, files, pengaturan, musik, terminal, gambar)
 package.json      — metadata package npm + perintah `rutbhics`
-bin/rutbhics.js   — server lokal (tanpa dependensi) untuk perintah `rutbhics`, termasuk proxy Bot AI (/api/chat)
+bin/rutbhics.js   — server lokal (tanpa dependensi) untuk perintah `rutbhics`, termasuk proxy Bot AI (/api/chat) dan chat multi-user
+config.example.json — contoh config.json multi-provider (tanpa kunci)
 .env.example      — contoh konfigurasi lokal Bot AI (kunci API, base URL, model; tanpa nilai asli)
-.gitignore        — menjaga .env tidak masuk repo
+.gitignore        — menjaga .env dan config.json tidak masuk repo
 ```
 
-## Bot AI (Larprouter)
+## 🤖 Bot AI (Larprouter)
 
 Semua kontak di aplikasi Obrolan (Teman, Grup Keluarga, Bot Asisten) menjawab
 memakai AI Larprouter (OpenAI-compatible), bukan lagi balasan demo acak —
@@ -145,7 +136,8 @@ Catatan:
 - Tanpa `.env` (atau bila halaman dibuka sebagai situs statis tanpa server
   lokal), Bot Asisten memberi tahu cara mengaktifkannya, bukan berpura-pura
   menjawab pakai AI.
-## Chat multi-user
+
+## 👥 Chat multi-user
 
 Obrolan juga punya mode multi-user (tombol "👥 Multi-User" di atas daftar
 kontak): pesan disimpan di server `rutbhics` dan terlihat semua perangkat
@@ -155,21 +147,21 @@ Cara memakai:
 
 1. Jalankan `rutbhics` di satu perangkat (ini servernya).
 2. Dari perangkat lain di jaringan yang sama, buka `http://<IP-perangkat-server>:8080`.
-3. Buka Obrolan → "👥 Multi-User", isi nama, pilih/buat ruang, kirim pesan.
+3. Buka Obrolan → "👥 Multi-User", masuk/daftar, pilih/buat ruang, kirim pesan.
    Pesan baru diambil tiap 3 detik.
 
 Catatan jujur (tahap 1):
 
-- Tanpa akun server: nama pengirim adalah nama yang diklaim tiap perangkat
-  (diambil dari login desktop atau kolom nama), jadi siapa pun di jaringan
-  bisa memakai nama apa pun. Jangan pakai untuk percakapan rahasia.
+- Nama pengirim kini username terverifikasi lewat akun server (lihat
+  Akun pengguna di bawah) — bukan lagi nama klaim bebas. Membaca ruang
+  dan pesan tetap terbuka tanpa login.
 - Pesan tersimpan di berkas `rutbhics-chat.json` di folder tempat `rutbhics`
   dijalankan (bertahan saat server di-restart); maksimal 20 ruang dan 500
   pesan terakhir per ruang.
 - Endpoint AI (`/api/chat`, `/api/models`) tetap hanya menerima koneksi
   lokal, supaya kunci Larprouter tidak bisa dipakai perangkat lain.
 
-## Akun pengguna (login/register)
+## 👤 Akun pengguna (login/register)
 
 Membaca ruang dan pesan tetap terbuka, tapi membuat ruang dan mengirim
 pesan wajib login — nama pengirim selalu username terverifikasi dari
@@ -206,7 +198,7 @@ Metode yang tersedia:
 Catatan jujur (tahap ini): belum ada verifikasi email, lupa kata
 sandi, atau ganti kata sandi — itu tahap berikutnya bila dibutuhkan.
 
-## config.json multi-provider (gaya router AI)
+## 🔌 config.json multi-provider (gaya router AI)
 
 Tanpa `config.json`, Rutbhics hanya memakai Larprouter dari `.env`
 (perilaku lama, tidak berubah). Dengan `config.json`, chat bisa memakai
