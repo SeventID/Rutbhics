@@ -1658,7 +1658,37 @@ const server = http.createServer((req, res) => {
     res.end("Terjadi kesalahan");
   }
 });
-setInterval(() => pruneSessions(true), 60 * 60 * 1000).unref();
+// Penyapuan berkala map throttle/state (A2-08): entri yang sudah
+// kedaluwarsa secara semantik dibersihkan dari memori pada interval
+// prune sesi per jam yang sama — bukan keputusan keamanan baru.
+// KRITIS: jendela di sini PERSIS sama dengan pemeriksaan malas
+// (login 10 menit, register 1 jam, state OAuth 10 menit, rate pesan
+// 1 jam); entri dalam jendela TIDAK BOLEH dihapus — menghapusnya
+// akan membiarkan penyerang mencoba lagi lebih cepat. Semua keputusan
+// blokir tetap ditegakkan pemeriksaan malas, bukan oleh sapuan ini.
+// Array rate pesan yang kosong setelah filter ikut dihapus (pemeriksaan
+// malas membuatnya lagi bila perlu).
+function sweepStaleMaps() {
+  const now = Date.now();
+  for (const k of Object.keys(loginFails)) {
+    if (!loginFails[k] || now - loginFails[k].first > 10 * 60 * 1000) delete loginFails[k];
+  }
+  for (const k of Object.keys(loginFailsByAccount)) {
+    if (!loginFailsByAccount[k] || now - loginFailsByAccount[k].first > 10 * 60 * 1000) delete loginFailsByAccount[k];
+  }
+  for (const k of Object.keys(registerAttempts)) {
+    if (!registerAttempts[k] || now - registerAttempts[k].first > 60 * 60 * 1000) delete registerAttempts[k];
+  }
+  for (const k of Object.keys(oauthStates)) {
+    if (!oauthStates[k] || now - oauthStates[k].createdAt > 10 * 60 * 1000) delete oauthStates[k];
+  }
+  for (const k of Object.keys(msgRateByUser)) {
+    if (!Array.isArray(msgRateByUser[k])) { delete msgRateByUser[k]; continue; }
+    msgRateByUser[k] = msgRateByUser[k].filter((t) => t > now - 3600000);
+    if (msgRateByUser[k].length === 0) delete msgRateByUser[k];
+  }
+}
+setInterval(() => { pruneSessions(true); sweepStaleMaps(); }, 60 * 60 * 1000).unref();
 server.listen(port, host, () => {
   console.log("Rutbhics berjalan di http://" + host + ":" + port + (host === "0.0.0.0" ? " (semua interface)" : ""));
   if (host === "0.0.0.0") {

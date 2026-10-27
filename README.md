@@ -352,6 +352,16 @@ Perilaku:
 >   SAMEORIGIN` (desktop tidak pernah dibingkai lintas-origin secara
 >   sah). CSP tetap S12 dan tidak dikerjakan di sini.
 >
+> **Penyapuan map throttle/state (A2-08):** pada interval prune sesi
+>   per jam yang sama, server ikut menyapu entri kedaluwarsa dari
+>   `loginFails`, `loginFailsByAccount`, `registerAttempts`,
+>   `oauthStates`, dan array rate pesan yang sudah kosong — memakai
+>   jendela yang PERSIS sama dengan pemeriksaan malas (login 10 menit,
+>   register 1 jam, state OAuth 10 menit, rate pesan 1 jam), sehingga
+>   tidak ada entri dalam jendela yang terhapus. Sapuan ini hanya
+>   kebersihan memori; semua keputusan blokir tetap ditegakkan
+>   pemeriksaan malas, bukan oleh sapuan.
+>
 > **PERINGATAN TEGAS:** `AI_ACCESS=local` yang disetel eksplisit TETAP
 > BERBAHAYA bila server diekspos lewat reverse proxy/domain publik —
 > kunci AI menjadi terbuka; operator yang mengekspos server WAJIB memakai
