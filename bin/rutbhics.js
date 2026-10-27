@@ -401,6 +401,32 @@ function isLoopbackOrigin(req) {
   } catch (e) { return false; }
 }
 
+// Cek Origin same-origin untuk POST tulis (P2b): lolos bila tanpa Origin,
+// Origin loopback, atau Origin host == Host header (akses LAN via IP tetap
+// jalan karena klien selalu same-origin; situs asing selalu ditolak).
+// Catatan: loopback-only saja akan merusak login/tulis rooms saat server
+// diakses via IP LAN (--host), jadi pencocokan Host disengaja.
+function hostNameOf(hostHeader) {
+  const h = (hostHeader || "").trim().toLowerCase();
+  if (h.startsWith("[")) {
+    const end = h.indexOf("]");
+    return end === -1 ? h : h.slice(1, end);
+  }
+  return h.split(":")[0];
+}
+function isSameOriginWrite(req) {
+  const origin = req.headers.origin;
+  if (!origin) return true;
+  if (isLoopbackOrigin(req)) return true;
+  try {
+    const u = new URL(origin);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return false;
+    const h = u.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+    const host = hostNameOf(req.headers.host);
+    return h !== "" && h === host;
+  } catch (e) { return false; }
+}
+
 // Header keamanan dasar (P2a) untuk SEMUA respons. CSP sengaja belum
 // ditambah: skrip inline di index.html/login.html akan rusak.
 function securityHeaders() {
@@ -635,6 +661,10 @@ function slugRoom(name) {
   return id;
 }
 function handleRooms(req, res) {
+  if (req.method === "POST" && !isSameOriginWrite(req)) {
+    sendJson(res, 403, { error: "origin_tidak_diizinkan" });
+    return;
+  }
   const url = new URL(req.url, "http://localhost");
   const parts = url.pathname.split("/").filter(Boolean); // ["api","rooms",id?,"messages"?]
   if (req.method === "GET" && parts.length === 2) {
@@ -871,6 +901,10 @@ function oauthFail(res, msg) {
 }
 function handleAuth(req, res) {
   pruneSessions(false);
+  if (req.method === "POST" && !isSameOriginWrite(req)) {
+    sendJson(res, 403, { error: "origin_tidak_diizinkan" });
+    return;
+  }
   const url = new URL(req.url, "http://localhost");
   const parts = url.pathname.split("/").filter(Boolean); // ["api","auth",...]
   const action = parts[2] || "";
