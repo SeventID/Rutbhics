@@ -239,9 +239,108 @@
     var now = new Date();
     document.getElementById("clock-time").textContent = timeFmt.format(now);
     document.getElementById("clock-date").textContent = dateFmt.format(now);
+    // Widget jam ikut diperbarui tiap detik (setelah widget dibuat di bawah).
+    if (typeof widgetTimeEl !== "undefined" && widgetTimeEl) {
+      widgetTimeEl.textContent = widgetTimeFmt.format(now);
+      widgetDateEl.textContent = widgetDateFmt.format(now);
+    }
   }
   tick();
   setInterval(tick, 1000);
+
+  // ---------- Widget jam/kalender desktop ----------
+  // Pojok kanan atas desktop (di bawah jendela, di atas wallpaper):
+  // jam WIB live tiap detik + tanggal + kalender bulan berjalan.
+  // Kalender bisa digeser bulan (◀ ▶), "Hari ini" kembali ke bulan
+  // berjalan, dan tanggal bisa diketuk untuk dipilih.
+  var widgetTimeFmt = new Intl.DateTimeFormat("id-ID", {
+    timeZone: "Asia/Jakarta", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false
+  });
+  var widgetDateFmt = new Intl.DateTimeFormat("id-ID", {
+    timeZone: "Asia/Jakarta", weekday: "long", day: "numeric", month: "long", year: "numeric"
+  });
+  var MONTHS_ID = ["Januari", "Februari", "Maret", "April", "Mei", "Juni",
+    "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+  var DOW_ID = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
+  var widgetEl = document.createElement("section");
+  widgetEl.id = "desktop-widget";
+  var widgetTimeEl = document.createElement("div");
+  widgetTimeEl.className = "widget-time";
+  var widgetDateEl = document.createElement("div");
+  widgetDateEl.className = "widget-date";
+  var calHead = document.createElement("div");
+  calHead.className = "cal-head";
+  var calPrev = document.createElement("button");
+  calPrev.className = "cal-nav"; calPrev.textContent = "◀";
+  var calTitle = document.createElement("div");
+  calTitle.className = "cal-title";
+  var calNext = document.createElement("button");
+  calNext.className = "cal-nav"; calNext.textContent = "▶";
+  var calGrid = document.createElement("div");
+  calGrid.className = "cal-grid";
+  var calTodayBtn = document.createElement("button");
+  calTodayBtn.className = "cal-nav widget-today"; calTodayBtn.textContent = "Hari ini";
+  var calSel = document.createElement("div");
+  calSel.className = "widget-sel";
+  calSel.textContent = "Ketuk tanggal untuk memilih.";
+  calHead.appendChild(calPrev); calHead.appendChild(calTitle); calHead.appendChild(calNext);
+  widgetEl.appendChild(widgetTimeEl); widgetEl.appendChild(widgetDateEl);
+  widgetEl.appendChild(calHead); widgetEl.appendChild(calGrid);
+  widgetEl.appendChild(calTodayBtn); widgetEl.appendChild(calSel);
+  document.body.appendChild(widgetEl);
+
+  var calView = new Date(); calView.setDate(1);
+  var calSelected = null;
+  function sameDay(a, b) {
+    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  }
+  function renderCalendar() {
+    var y = calView.getFullYear(), m = calView.getMonth();
+    calTitle.textContent = MONTHS_ID[m] + " " + y;
+    calGrid.innerHTML = "";
+    var today = new Date();
+    DOW_ID.forEach(function (d) {
+      var h = document.createElement("div");
+      h.className = "cal-dow"; h.textContent = d;
+      calGrid.appendChild(h);
+    });
+    var firstDay = new Date(y, m, 1).getDay();
+    var days = new Date(y, m + 1, 0).getDate();
+    for (var i = 0; i < firstDay; i++) {
+      var blank = document.createElement("span");
+      blank.className = "cal-empty";
+      calGrid.appendChild(blank);
+    }
+    for (var d = 1; d <= days; d++) {
+      (function (day) {
+        var b = document.createElement("button");
+        b.className = "cal-day";
+        b.textContent = String(day);
+        var dt = new Date(y, m, day);
+        if (sameDay(dt, today)) b.classList.add("today");
+        if (calSelected && sameDay(dt, calSelected)) b.classList.add("selected");
+        b.addEventListener("click", function () {
+          calSelected = dt;
+          calSel.textContent = "Dipilih: " + widgetDateFmt.format(dt);
+          renderCalendar();
+        });
+        calGrid.appendChild(b);
+      })(d);
+    }
+  }
+  calPrev.addEventListener("click", function () { calView.setMonth(calView.getMonth() - 1); renderCalendar(); });
+  calNext.addEventListener("click", function () { calView.setMonth(calView.getMonth() + 1); renderCalendar(); });
+  calTodayBtn.addEventListener("click", function () {
+    calView = new Date(); calView.setDate(1);
+    renderCalendar();
+  });
+  function updateWidgetClock() {
+    var now = new Date();
+    widgetTimeEl.textContent = widgetTimeFmt.format(now);
+    widgetDateEl.textContent = widgetDateFmt.format(now);
+  }
+  updateWidgetClock();
+  renderCalendar();
 
   // Sesi login: tampilkan pengguna & tombol keluar di menu Start.
   try {

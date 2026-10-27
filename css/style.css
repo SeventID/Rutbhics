@@ -81,6 +81,22 @@ input, textarea { font: inherit; color: var(--ink); }
 .gambar-btn.active { border-color: var(--ink); background: rgba(255, 255, 255, .18); }
 .gambar-canvas { width: 100%; height: auto; display: block; background: #fff; border: 1px solid var(--border); border-radius: 10px; touch-action: none; cursor: crosshair; }
 
+/* Widget jam/kalender desktop */
+#desktop-widget { position: fixed; z-index: 1; top: 16px; right: 16px; width: 236px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; box-shadow: 0 12px 30px rgba(0, 0, 0, .35); backdrop-filter: blur(8px); }
+.widget-time { font-size: 34px; font-weight: 800; letter-spacing: 1px; }
+.widget-date { color: var(--muted); font-size: 13px; margin: 2px 0 12px; }
+.cal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.cal-title { font-weight: 700; font-size: 14px; }
+.cal-nav { border: 1px solid var(--border); border-radius: 8px; padding: 4px 8px; background: rgba(255, 255, 255, .08); color: var(--ink); font-size: 12px; }
+.widget-today { margin-top: 8px; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; font-size: 12px; }
+.cal-dow { color: var(--muted); font-weight: 600; padding: 3px 0; }
+.cal-day { border: 0; background: transparent; color: var(--ink); border-radius: 6px; padding: 4px 0; }
+.cal-day:hover { background: rgba(255, 255, 255, .12); }
+.cal-day.today { background: var(--accent); color: #fff; font-weight: 700; }
+.cal-day.selected { outline: 2px solid var(--accent); }
+.widget-sel { color: var(--muted); font-size: 12px; margin-top: 8px; }
+
 /* Taskbar */
 #taskbar {
   position: fixed; z-index: 100; left: 0; right: 0; bottom: 0;
