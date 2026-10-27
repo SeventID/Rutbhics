@@ -552,7 +552,14 @@ function isSameOriginWrite(req) {
 function securityHeaders() {
   return {
     "X-Content-Type-Options": "nosniff",
-    "Referrer-Policy": "strict-origin-when-cross-origin"
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    // Framing (A2-07): desktop tidak pernah dibingkai lintas-origin secara
+    // sah (aplikasi top-level; Peramban membingkai situs luar, bukan
+    // halaman sendiri), jadi SAMEORIGIN memblokir clickjacking dari situs
+    // asing tanpa mengganggu pemakaian same-origin apa pun. Berlaku untuk
+    // SEMUA respons karena semua writeHead memakai helper ini. CSP tetap
+    // S12 (butuh uji browser nyata) dan TIDAK dikerjakan di sini.
+    "X-Frame-Options": "SAMEORIGIN"
   };
 }
 
@@ -1591,6 +1598,16 @@ if (aiAccessMode === "local" && (process.env.AI_ACCESS || "").trim().toLowerCase
 const server = http.createServer((req, res) => {
   try {
     const url = new URL(req.url, "http://localhost");
+    // Cache-Control (A2-07): respons API tidak boleh disimpan cache
+    // browser — data API bersifat per-pengguna (ruang, sesi, status AI).
+    // Diterapkan di sini secara terpusat (setHeader) agar SEMUA respons
+    // /api/* membawanya, termasuk gerbang awal 401/403, oauthFail,
+    // redirect OAuth, dan 404 rute API yang jatuh ke penyajian statis
+    // (rute /api/* tak dikenal tidak dicocokkan router sehingga dilayani
+    // jalur statis). Respons statis tidak disentuh: caching-nya berguna
+    // dan isinya bukan data pengguna. /health bukan /api/* sehingga
+    // sengaja tidak membawa no-store.
+    if (url.pathname === "/api" || url.pathname.startsWith("/api/")) res.setHeader("Cache-Control", "no-store");
     if (url.pathname === "/api/chat") { handleChat(req, res); return; }
     if (url.pathname === "/api/models") { handleModels(req, res); return; }
     // Health check terbuka (P2h): hanya {ok:true}, tanpa data apa pun.

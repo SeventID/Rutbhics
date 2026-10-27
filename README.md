@@ -344,6 +344,14 @@ Perilaku:
 >   atau OOM. Provider lambat yang sah tidak terpengaruh selama di
 >   bawah batas ini.
 >
+> **Header respons (A2-07):** semua respons `/api/*` membawa
+>   `Cache-Control: no-store` (diterapkan terpusat di handler utama,
+>   sehingga gerbang 401/403, halaman gagal OAuth, redirect, dan 404
+>   rute API ikut tercakup; respons statis dan `/health` sengaja tidak
+>   membawa no-store), dan semua respons membawa `X-Frame-Options:
+>   SAMEORIGIN` (desktop tidak pernah dibingkai lintas-origin secara
+>   sah). CSP tetap S12 dan tidak dikerjakan di sini.
+>
 > **PERINGATAN TEGAS:** `AI_ACCESS=local` yang disetel eksplisit TETAP
 > BERBAHAYA bila server diekspos lewat reverse proxy/domain publik —
 > kunci AI menjadi terbuka; operator yang mengekspos server WAJIB memakai
