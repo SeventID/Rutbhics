@@ -569,16 +569,54 @@ async function handleModels(req, res) {
 // Sengaja tanpa gate loopback (berbeda dengan /api/chat): perangkat lain
 // di jaringan harus bisa membaca/mengirim. Tahap 1 tanpa akun server.
 const CHAT_FILE = path.join(process.cwd(), "rutbhics-chat.json");
+// ---------- Persistensi atomik + backup (P1-3) ----------
+// Tulis lewat berkas temp + rename agar crash di tengah tulis tidak
+// meninggalkan berkas setengah. .bak hanya ditimpa bila berkas lama
+// masih valid (supaya backup tidak pernah berisi data korup). Gagal
+// simpan dicatat ke stderr, tidak ditelan diam-diam.
+function backupIfValid(file) {
+  try {
+    JSON.parse(fs.readFileSync(file, "utf8"));
+    fs.copyFileSync(file, file + ".bak");
+  } catch (e) { /* berkas lama hilang/korup: jangan timpa backup */ }
+}
+function atomicSave(file, data) {
+  const tmp = file + ".tmp-" + process.pid;
+  try {
+    fs.writeFileSync(tmp, JSON.stringify(data));
+    backupIfValid(file);
+    fs.renameSync(tmp, file);
+  } catch (e) {
+    console.error("[rutbhics] GAGAL menyimpan " + file + ": " + (e && e.message ? e.message : e));
+    try { fs.unlinkSync(tmp); } catch (e2) { /* abaikan */ }
+  }
+}
+function loadJsonWithBackup(file, validate) {
+  const tryParse = (f) => {
+    try {
+      const p = JSON.parse(fs.readFileSync(f, "utf8"));
+      return validate(p) ? p : null;
+    } catch (e) { return null; }
+  };
+  const data = tryParse(file);
+  if (data) return data;
+  const bak = tryParse(file + ".bak");
+  if (bak) {
+    console.error("[rutbhics] PERINGATAN: " + file + " rusak/tidak valid, dipulihkan dari " + file + ".bak");
+    return bak;
+  }
+  if (fs.existsSync(file)) {
+    console.error("[rutbhics] PERINGATAN KERAS: " + file + " rusak dan tidak ada backup valid — mulai dari data kosong.");
+  }
+  return null;
+}
 let chatData = { rooms: [{ id: "umum", name: "Umum" }], messages: { umum: [] }, seq: 0 };
-try {
-  const raw = fs.readFileSync(CHAT_FILE, "utf8");
-  const parsed = JSON.parse(raw);
-  if (parsed && Array.isArray(parsed.rooms) && parsed.messages && typeof parsed.seq === "number") chatData = parsed;
-} catch (e) { /* mulai kosong */ }
+const loadedChat = loadJsonWithBackup(CHAT_FILE, (x) => x && Array.isArray(x.rooms) && x.messages && typeof x.seq === "number");
+if (loadedChat) chatData = loadedChat;
 if (!chatData.rooms.some((r) => r.id === "umum")) chatData.rooms.unshift({ id: "umum", name: "Umum" });
 if (!Array.isArray(chatData.messages.umum)) chatData.messages.umum = [];
 function saveChat() {
-  try { fs.writeFileSync(CHAT_FILE, JSON.stringify(chatData)); } catch (e) { /* tetap jalan di memori */ }
+  atomicSave(CHAT_FILE, chatData);
 }
 function slugRoom(name) {
   let s = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
@@ -656,13 +694,10 @@ function handleRooms(req, res) {
 // ruang dan mengirim pesan wajib login.
 const USERS_FILE = path.join(process.cwd(), "rutbhics-users.json");
 let usersData = { users: [], sessions: {} };
-try {
-  const raw = fs.readFileSync(USERS_FILE, "utf8");
-  const parsed = JSON.parse(raw);
-  if (parsed && Array.isArray(parsed.users) && parsed.sessions && typeof parsed.sessions === "object") usersData = parsed;
-} catch (e) { /* mulai kosong */ }
+const loadedUsers = loadJsonWithBackup(USERS_FILE, (x) => x && Array.isArray(x.users) && x.sessions && typeof x.sessions === "object");
+if (loadedUsers) usersData = loadedUsers;
 function saveUsers() {
-  try { fs.writeFileSync(USERS_FILE, JSON.stringify(usersData)); } catch (e) { /* tetap jalan di memori */ }
+  atomicSave(USERS_FILE, usersData);
 }
 function hashPassword(pw) {
   const salt = crypto.randomBytes(16).toString("hex");
