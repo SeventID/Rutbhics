@@ -9,9 +9,11 @@
 //   kontak di aplikasi Obrolan (Teman, Grup Keluarga, Bot Asisten, dengan
 //   persona masing-masing). Klien boleh menyertakan "model" di body untuk
 //   memilih model per percakapan; tanpa itu dipakai model bawaan server.
+//   Akses digate mode AI_ACCESS (S1): local = loopback saja tanpa login,
+//   login = wajib sesi (lihat resolveAiAccessMode + README Deployment).
 //   GET /api/models — daftar model gabungan "provider:model" dari semua
 //   provider aktif (live dari upstream bila perlu; kalau tidak ada
-//   provider aktif, daftar cadangan).
+//   provider aktif, daftar cadangan). Gate sama seperti /api/chat.
 //   config.json (opsional, di folder kerja atau folder paket) — setelan
 //   seperti port dan daftar provider AI (Anthropic, Gemini, DeepSeek,
 //   OpenAI, Larprouter, ...). Kunci API TIDAK PERNAH di config.json:
@@ -426,6 +428,29 @@ function isLoopbackOrigin(req) {
   } catch (e) { return false; }
 }
 
+// Gate mode login (S1): alamat socket TIDAK berperan sama sekali —
+// Origin dapat dipalsukan klien lewat proxy, jadi tidak boleh menjadi
+// pengecualian tanpa login. Tanpa sesi -> 401 untuk SEMUA varian Origin;
+// ada sesi + (tanpa Origin ATAU Origin host loopback ATAU Origin host ==
+// Host header) -> izinkan; ada sesi + Origin asing -> 403 (defense-in-depth
+// CSRF; SameSite=Lax sudah menahan cookie pada POST lintas situs).
+// Mengembalikan null bila diizinkan, atau {status, error, message}.
+function aiAccessLogin(req) {
+  const me = sessionUser(req);
+  if (!me) return { status: 401, error: "login_diperlukan", message: "Endpoint AI memerlukan login." };
+  const origin = req.headers.origin;
+  if (!origin) return null;
+  try {
+    const u = new URL(origin);
+    if (u.protocol === "http:" || u.protocol === "https:") {
+      const h = u.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+      if (h === "localhost" || h === "127.0.0.1" || h === "::1") return null;
+      if (h !== "" && h === hostNameOf(req.headers.host)) return null;
+    }
+  } catch (e) { /* jatuh ke 403 */ }
+  return { status: 403, error: "origin_tidak_diizinkan", message: "Origin tidak diizinkan untuk endpoint AI." };
+}
+
 // Cek Origin same-origin untuk POST tulis (P2b): lolos bila tanpa Origin,
 // Origin loopback, atau Origin host == Host header (akses LAN via IP tetap
 // jalan karena klien selalu same-origin; situs asing selalu ditolak).
@@ -485,15 +510,23 @@ function readBody(req, limit) {
 // Provider bawaan Larprouter termasuk dalam daftar provider; klien
 // memilih model lewat "provider:model" atau model bawaan server.
 function handleChat(req, res) {
-  // Hanya dari perangkat ini: kunci dibayar pemiliknya, jangan sampai
-  // dipakai perangkat lain yang se-jaringan.
-  if (!isLoopback(req)) {
-    sendJson(res, 403, { error: "forbidden", message: "Endpoint /api/chat hanya untuk pemakaian lokal." });
-    return;
-  }
-  if (!isLoopbackOrigin(req)) {
-    sendJson(res, 403, { error: "origin_tidak_diizinkan", message: "Origin tidak diizinkan untuk endpoint lokal." });
-    return;
+  if (aiAccessMode === "local") warnProxyOnce(req);
+  // Gate akses AI (S1): mode login -> aiAccessLogin (socket diabaikan);
+  // mode local -> perilaku lama PERSIS (gate socket + gate Origin).
+  if (aiAccessMode === "login") {
+    const gate = aiAccessLogin(req);
+    if (gate) { sendJson(res, gate.status, { error: gate.error, message: gate.message }); return; }
+  } else {
+    // Hanya dari perangkat ini: kunci dibayar pemiliknya, jangan sampai
+    // dipakai perangkat lain yang se-jaringan.
+    if (!isLoopback(req)) {
+      sendJson(res, 403, { error: "forbidden", message: "Endpoint /api/chat hanya untuk pemakaian lokal." });
+      return;
+    }
+    if (!isLoopbackOrigin(req)) {
+      sendJson(res, 403, { error: "origin_tidak_diizinkan", message: "Origin tidak diizinkan untuk endpoint lokal." });
+      return;
+    }
   }
   if (req.method === "GET") {
     const active = activeProviders();
@@ -581,13 +614,20 @@ function handleChat(req, res) {
 // kosong diambil live dari {baseUrl}/models; anthropic/gemini wajib dari
 // config. Bila gabungan kosong, kembali ke daftar cadangan lama.
 async function handleModels(req, res) {
-  if (!isLoopback(req)) {
-    sendJson(res, 403, { error: "forbidden", message: "Endpoint /api/models hanya untuk pemakaian lokal." });
-    return;
-  }
-  if (!isLoopbackOrigin(req)) {
-    sendJson(res, 403, { error: "origin_tidak_diizinkan", message: "Origin tidak diizinkan untuk endpoint lokal." });
-    return;
+  if (aiAccessMode === "local") warnProxyOnce(req);
+  // Gate akses AI (S1, sama seperti /api/chat).
+  if (aiAccessMode === "login") {
+    const gate = aiAccessLogin(req);
+    if (gate) { sendJson(res, gate.status, { error: gate.error, message: gate.message }); return; }
+  } else {
+    if (!isLoopback(req)) {
+      sendJson(res, 403, { error: "forbidden", message: "Endpoint /api/models hanya untuk pemakaian lokal." });
+      return;
+    }
+    if (!isLoopbackOrigin(req)) {
+      sendJson(res, 403, { error: "origin_tidak_diizinkan", message: "Origin tidak diizinkan untuk endpoint lokal." });
+      return;
+    }
   }
   if (req.method !== "GET") {
     sendJson(res, 405, { error: "method_tidak_didukung" });
@@ -1189,8 +1229,62 @@ if (process.argv.includes("--setup")) {
   process.exit(0);
 }
 
+// Mode akses AI (S1, P0-N1): eksplisit lewat env AI_ACCESS ("local"|"login").
+// Bila tidak disetel, diturunkan dari --host: host non-loopback ->
+// "login", selain itu "local". PERHATIAN: mode turunan TIDAK dapat
+// mendeteksi reverse proxy — server --host 127.0.0.1 yang di-proxy
+// tetap ber-mode local; di balik proxy/domain publik, operator WAJIB
+// menyetel AI_ACCESS=login secara eksplisit (lihat README Deployment).
+// Nilai tak valid -> peringatan + pakai mode turunan.
+function isLoopbackHostName(h) {
+  const s = (h || "").trim().toLowerCase();
+  return s === "127.0.0.1" || s === "::1" || s === "localhost" || s === "::ffff:127.0.0.1";
+}
+function resolveAiAccessMode(host) {
+  const v = (process.env.AI_ACCESS || "").trim().toLowerCase();
+  if (v === "local" || v === "login") return v;
+  if (v) console.error("[rutbhics] AI_ACCESS tidak valid, pakai mode turunan dari --host.");
+  return isLoopbackHostName(host) ? "local" : "login";
+}
+// Peringatan proxy sekali per proses (S1, log saja — tidak mengubah akses):
+// dalam mode local, request AI dengan tanda proxy (X-Forwarded-For /
+// X-Real-IP hadir, atau Host/Origin non-loopback) menandakan server
+// kemungkinan sedang di-proxy; operator harus pindah ke mode login.
+// Best-effort: Origin loopback PALSU lewat proxy TIDAK terdeteksi,
+// itulah mengapa local + proxy dilarang tanpa pengecualian.
+let proxyWarningShown = false;
+function warnProxyOnce(req) {
+  if (proxyWarningShown) return;
+  const xff = req.headers["x-forwarded-for"];
+  const xrip = req.headers["x-real-ip"];
+  let hostNonLoop = false;
+  if (req.headers.host) {
+    try { hostNonLoop = !isLoopbackHostName(hostNameOf(req.headers.host)); } catch (e) {}
+  }
+  let originNonLoop = false;
+  const origin = req.headers.origin;
+  if (origin) {
+    try {
+      const u = new URL(origin);
+      if (u.protocol === "http:" || u.protocol === "https:") {
+        const h = u.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+        originNonLoop = h !== "" && h !== "localhost" && h !== "127.0.0.1" && h !== "::1";
+      }
+    } catch (e) {}
+  }
+  if (!xff && !xrip && !hostNonLoop && !originNonLoop) return;
+  proxyWarningShown = true;
+  console.error("[rutbhics] PERINGATAN KERAS: tanda proxy teramati pada request AI (header tanda-proxy hadir atau Host/Origin non-loopback) dalam mode local — hanya indikator, bukan bukti proxy; tidak dipakai untuk memberi akses. Server kemungkinan sedang di-proxy; kunci AI berisiko terbuka. Pindah ke mode login (AI_ACCESS=login).");
+}
+let aiAccessMode = "local";
+
 const port = parsePort(process.argv.slice(2));
 const host = parseHost(process.argv.slice(2));
+aiAccessMode = resolveAiAccessMode(host);
+console.log("[rutbhics] AI access mode: " + aiAccessMode + (aiAccessMode === "local" ? " (loopback only, must not be proxied)" : " (session required)"));
+if (aiAccessMode === "local" && (process.env.AI_ACCESS || "").trim().toLowerCase() === "local" && !isLoopbackHostName(host)) {
+  console.error("[rutbhics] PERINGATAN KERAS: mode local dipilih eksplisit (AI_ACCESS=local) dengan host non-loopback (" + host + ") — server dapat dijangkau jaringan; bila server ini diekspos lewat proxy/domain publik, kunci AI terbuka. Pindah ke mode login (AI_ACCESS=login). Mode tetap local sesuai pilihan operator.");
+}
 const server = http.createServer((req, res) => {
   try {
     const url = new URL(req.url, "http://localhost");

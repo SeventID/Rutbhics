@@ -135,7 +135,9 @@ Catatan:
   `deepseek-v4.1-flash` (bisa diubah lewat `LARPROUTER_MODEL` di `.env`,
   atau `defaultModel` di `config.json`; model utama `claude-opus-4-7-1m`
   bisa dipakai begitu kreditnya cukup). Daftar model server tersedia lewat
-  `GET /api/models` (loopback-only), tapi tidak lagi ditampilkan sebagai
+  `GET /api/models` (akses mengikuti mode AI_ACCESS di bagian Deployment:
+  mode local = browser lokal tanpa login, mode login = wajib login),
+  tapi tidak lagi ditampilkan sebagai
   dropdown di Obrolan; pilihan model lama yang tersimpan di perangkat
   (`wd-model`) dibersihkan otomatis saat Obrolan dibuka.
 - Multi-bahasa chat: dropdown "Bahasa balasan" di Obrolan — bisa "Ikuti
@@ -146,7 +148,9 @@ Catatan:
 - Kunci tidak pernah masuk repo, tidak pernah dikirim ke browser: browser hanya
   memanggil `POST /api/chat` di server lokal, kunci dibaca server dari `.env`.
   Server juga tidak pernah melayani berkas `.env` sebagai berkas statis, dan
-  endpoint `/api/chat` hanya menerima koneksi dari perangkat itu sendiri.
+  endpoint `/api/chat` menerima browser lokal tanpa login (mode local)
+  atau pengguna yang sudah login (mode login) — lihat mode AI_ACCESS di
+  bagian Deployment.
 - Tanpa `.env` (atau bila halaman dibuka sebagai situs statis tanpa server
   lokal), Bot Asisten memberi tahu cara mengaktifkannya, bukan berpura-pura
   menjawab pakai AI.
@@ -275,33 +279,54 @@ Perilaku:
 
 ## 🚀 Deployment (VPS)
 
-> ⚠️ **PERINGATAN KEAMANAN (P0-N1, sebelum S1):** panduan proxy di bawah
-> ini menggugurkan gate AI loopback. Selama server diekspos lewat reverse
-> proxy, **jangan mengekspos `/api/chat` ke internet** sebelum perbaikan
-> S1 mendarat: skrip tanpa Origin (curl/bot) lolos tanpa login dan dapat
-> memakai kunci AI-mu, sementara browser jarak jauh yang sah justru
-> ditolak (403). Untuk VPS publik, sementara batasi lewat firewall
-> (hanya IP operator) atau jangan aktifkan kunci AI.
+> **Akses endpoint AI (`/api/chat`, `/api/models`) — mode eksplisit S1
+> (menggantikan gate loopback lama yang runtuh di balik reverse proxy,
+> P0-N1).**
 >
-> **Aturan mode S1 (yang akan mendarat) — prioritas konfigurasi
-> eksplisit:** `AI_ACCESS=local` atau `AI_ACCESS=login` yang disetel
-> operator = pilihan utama, mengalahkan segalanya. Bila tidak disetel:
-> host loopback → `local`; host non-loopback → `login`. Log startup
-> menampilkan mode efektif.
+> **Prioritas konfigurasi (eksplisit):** `AI_ACCESS=local` atau
+> `AI_ACCESS=login` yang disetel operator = pilihan utama, mengalahkan
+> segalanya. Bila tidak disetel: host loopback → `local`; host
+> non-loopback → `login`. Log startup menampilkan mode efektif
+> (`AI access mode: ...`).
+>
+> - **Mode `local` (default pemakaian perangkat sendiri):** perilaku lama
+>   PERSIS — gate socket loopback + gate Origin loopback, tanpa login.
+> - **Mode `login` (wajib di balik proxy/domain publik):** alamat socket
+>   TIDAK berperan. Tanpa sesi login → 401 untuk SEMUA varian Origin
+>   (tanpa Origin, Origin loopback palsu, Origin domain publik, Origin
+>   jahat). Ada sesi + (tanpa Origin ATAU Origin host loopback ATAU
+>   Origin host == Host header) → diizinkan. Ada sesi + Origin asing →
+>   403. Konsekuensi yang disengaja: browser LAN/jarak jauh dan skrip
+>   WAJIB login (akun server) untuk memakai Bot AI; `GET /api/chat`
+>   (status) ikut digate dengan aturan yang sama. Tidak ada flag mode
+>   lain: `AI_ACCESS` sudah cukup.
 >
 > **PERINGATAN TEGAS:** `AI_ACCESS=local` yang disetel eksplisit TETAP
 > BERBAHAYA bila server diekspos lewat reverse proxy/domain publik —
 > kunci AI menjadi terbuka; operator yang mengekspos server WAJIB memakai
 > mode `login`. Mode `local` hanya untuk pemakaian perangkat sendiri
 > TANPA proxy — tidak boleh diletakkan di balik proxy atau diekspos,
-> tanpa pengecualian.
+> tanpa pengecualian. Mode turunan tidak dapat mendeteksi proxy:
+> server `--host 127.0.0.1` yang di-proxy tetap ber-mode local.
 >
-> **Tanda proxy hanya INDIKATOR, bukan bukti:** header `X-Forwarded-For` /
-> `X-Real-IP` dapat dipalsukan bila server menerima koneksi langsung dari
-> klien, dan Host/Origin non-loopback pun dapat dikirim siapa saja. Maka
-> tanda-tanda ini (yang dicatat S1 di log sebagai peringatan) hanya
-> indikator — bukan deteksi proxy yang sempurna — dan TIDAK PERNAH dipakai
-> sebagai dasar memberi akses. Akses hanya ditentukan mode + sesi.
+> **Peringatan runtime (dua lapis, log saja — tidak mengubah akses):**
+> mode `local` + `AI_ACCESS=local` eksplisit + host non-loopback →
+> peringatan keras di log startup (mode tetap local sesuai pilihan
+> operator). Mode `local` + request AI bertanda proxy (header
+> `X-Forwarded-For`/`X-Real-IP` hadir, atau Host/Origin non-loopback)
+> → peringatan keras di log SEKALI per proses bahwa tanda proxy teramati
+> dan server kemungkinan sedang di-proxy; operator harus pindah ke mode
+> login. **Tanda ini hanya INDIKATOR, bukan bukti:** header proxy dapat
+> dipalsukan pada koneksi langsung, dan deteksi ini best-effort —
+> Origin loopback PALSU lewat proxy TIDAK terdeteksi. Tanda proxy TIDAK
+> PERNAH dipakai sebagai dasar memberi akses; akses hanya ditentukan
+> mode + sesi. Log hanya mencatat mode + kategori (mis. "header
+> tanda-proxy hadir", "Host non-loopback") — tanpa nilai header, tanpa
+> cookie sesi, tanpa token, tanpa API key.
+>
+> Untuk deployment VPS di bawah ini (Nginx di depan `--host 127.0.0.1`),
+> setel `AI_ACCESS=login` (mis. `Environment=AI_ACCESS=login` di unit
+> systemd, atau di `.env` — dibaca dari WorkingDirectory).
 
 Jalankan server di loopback, lalu ekspos lewat reverse proxy + HTTPS.
 Jangan membuka port aplikasi langsung ke internet.
